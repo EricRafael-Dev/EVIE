@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Backgrounds -->
+    <color name="bg_dark">#060A13</color>
+    <color name="surface_dark">#09101E</color>
+    <color name="surface_card">#0D1629</color>
+    <color name="surface_card_border">#1A2E4C</color>
+
+    <!-- Sci-Fi HUD Accents -->
+    <color name="primary_accent">#00F0FF</color>
+    <color name="secondary_accent">#38BDF8</color>
+    <color name="hud_cyan">#00F0FF</color>
+    <color name="hud_cyan_dim">#267B96</color>
+    <color name="hud_cyan_glow">#3300F0FF</color>
+    
+    <!-- Red HUD Alert & Mute -->
+    <color name="hud_red">#FF4D4D</color>
+    <color name="hud_red_border">#7A1D28</color>
+    <color name="hud_red_bg">#1A080C</color>
+    <color name="status_red">#EF4444</color>
+
+    <!-- Green HUD Active & Voice -->
+    <color name="hud_green">#00E676</color>
+    <color name="hud_green_border">#165E38</color>
+    <color name="hud_green_bg">#092115</color>
+    <color name="status_green">#10B981</color>
+
+    <!-- Amber / Yellow Stats -->
+    <color name="hud_yellow">#F59E0B</color>
+    <color name="hud_yellow_dim">#B45309</color>
+
+    <!-- Typography -->
+    <color name="text_primary">#E1F5FE</color>
+    <color name="text_secondary">#7BA4C7</color>
+    <color name="text_dim">#415B76</color>
+    <color name="terminal_text">#78E3EE</color>
+    <color name="terminal_user">#60A5FA</color>
+    <color name="terminal_sys">#5EEAD4</color>
+    
+    <color name="bubble_user">#111C2E</color>
+    <color name="bubble_evie">#0A1D2E</color>
+    <color name="border_subtle">#1A2D48</color>
+</resources>

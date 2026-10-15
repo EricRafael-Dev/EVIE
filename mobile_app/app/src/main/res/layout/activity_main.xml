@@ -1,0 +1,780 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark">
+
+    <!-- Top Header Bar (Compact) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/headerLayout"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:background="#070C18"
+        android:paddingHorizontal="10dp"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Action Buttons Left: Settings & Reconnect (Transparent with Blue Borders) -->
+        <LinearLayout
+            android:id="@+id/headerActionsLeft"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageButton
+                android:id="@+id/btnSettings"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:contentDescription="Settings"
+                android:padding="5dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_menu_preferences"
+                app:tint="@color/primary_accent" />
+
+            <ImageButton
+                android:id="@+id/btnReconnect"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:contentDescription="Reconnect"
+                android:padding="5dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_menu_rotate"
+                app:tint="@color/primary_accent" />
+
+            <ImageButton
+                android:id="@+id/btnAttach"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:contentDescription="Anexar Fotos e Documentos"
+                android:padding="5dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_attach_file"
+                app:tint="@color/primary_accent" />
+
+            <ImageButton
+                android:id="@+id/btnHandoff"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:contentDescription="Alternar Saída de Áudio (PC / Fone)"
+                android:padding="5dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_headset"
+                app:tint="@color/primary_accent" />
+        </LinearLayout>
+
+        <!-- Center Title -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/rightHeaderLayout"
+            app:layout_constraintStart_toEndOf="@id/headerActionsLeft"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextView
+                android:id="@+id/tvLogo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.25"
+                android:text="EVIE"
+                android:textColor="@color/primary_accent"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvSub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-light"
+                android:letterSpacing="0.05"
+                android:text="Personal AI Assistant"
+                android:textColor="@color/text_dim"
+                android:textSize="8sp" />
+        </LinearLayout>
+
+        <!-- Right Header: Connection & Clock -->
+        <LinearLayout
+            android:id="@+id/rightHeaderLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <View
+                    android:id="@+id/statusDot"
+                    android:layout_width="6dp"
+                    android:layout_height="6dp"
+                    android:background="@drawable/ic_launcher_background" />
+
+                <TextView
+                    android:id="@+id/tvConnectionStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:fontFamily="monospace"
+                    android:text="ONLINE"
+                    android:textColor="@color/hud_green"
+                    android:textSize="8.5sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvClock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="10:59:51"
+                android:textColor="@color/text_primary"
+                android:textSize="11.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="Mon 12 Oct 2026"
+                android:textColor="@color/text_dim"
+                android:textSize="8sp" />
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- SYS MONITOR Panel (Compact) -->
+    <LinearLayout
+        android:id="@+id/sysMonitorPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginTop="3dp"
+        android:background="@drawable/bg_hud_panel"
+        android:orientation="vertical"
+        android:padding="5dp"
+        app:layout_constraintTop_toBottomOf="@id/headerLayout">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="❖ SYS MONITOR"
+            android:textColor="@color/primary_accent"
+            android:textSize="9.5sp"
+            android:textStyle="bold" />
+
+        <!-- 4 Metrics Row (CPU, MEM, NET, GPU) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:orientation="horizontal"
+            android:weightSum="4">
+
+            <!-- CPU -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="#070E1A"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="3dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="CPU"
+                    android:textColor="@color/text_dim"
+                    android:textSize="7.5sp" />
+
+                <TextView
+                    android:id="@+id/tvCpu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="9%"
+                    android:textColor="@color/primary_accent"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- MEM -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="#070E1A"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="3dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="MEM"
+                    android:textColor="@color/text_dim"
+                    android:textSize="7.5sp" />
+
+                <TextView
+                    android:id="@+id/tvMem"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="45%"
+                    android:textColor="@color/hud_yellow"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/pbMem"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="26dp"
+                    android:layout_height="2.5dp"
+                    android:layout_marginTop="1dp"
+                    android:max="100"
+                    android:progress="45"
+                    android:progressTint="@color/hud_yellow" />
+            </LinearLayout>
+
+            <!-- NET -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="#070E1A"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="3dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="NET"
+                    android:textColor="@color/text_dim"
+                    android:textSize="7.5sp" />
+
+                <TextView
+                    android:id="@+id/tvNet"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="1.2MB/s"
+                    android:textColor="@color/hud_green"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- GPU -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="#070E1A"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="3dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="GPU"
+                    android:textColor="@color/text_dim"
+                    android:textSize="7.5sp" />
+
+                <TextView
+                    android:id="@+id/tvGpu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="1%"
+                    android:textColor="@color/hud_yellow"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Sub-bar UP / PROC / OS -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvUptime"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="monospace"
+                android:text="UP 01:39"
+                android:textColor="@color/hud_green"
+                android:textSize="8sp" />
+
+            <TextView
+                android:id="@+id/tvProc"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:text="PROC 261"
+                android:textColor="@color/text_dim"
+                android:textSize="8sp" />
+
+            <TextView
+                android:id="@+id/tvOs"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="monospace"
+                android:gravity="end"
+                android:text="OS WIN"
+                android:textColor="@color/hud_yellow"
+                android:textSize="8sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Hologram 3D Sphere Section (Compact & Proportional) -->
+    <LinearLayout
+        android:id="@+id/hologramSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingVertical="4dp"
+        app:layout_constraintTop_toBottomOf="@id/sysMonitorPanel">
+
+        <!-- Evie Procedural Expressive Eyes Engine (60 FPS Vector Glow) -->
+        <com.evie.assistant.HologramSphereView
+            android:id="@+id/hologramCore"
+            android:layout_width="match_parent"
+            android:layout_height="170dp"
+            android:layout_marginHorizontal="10dp"
+            android:layout_marginTop="2dp" />
+
+        <!-- Minimalist Subtitle below Evie's Eyes -->
+        <TextView
+            android:id="@+id/tvEyesSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center"
+            android:fontFamily="sans-serif"
+            android:textColor="#7DD3FC"
+            android:textSize="11.5sp"
+            android:visibility="gone" />
+
+        <!-- Status Indicator below Evie's Eyes -->
+        <TextView
+            android:id="@+id/tvCoreStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.18"
+            android:text="◉ MUTED"
+            android:textColor="@color/hud_red"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <!-- Cognitive State in Real-Time -->
+        <TextView
+            android:id="@+id/tvCognitiveStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:fontFamily="monospace"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.08"
+            android:text="• OBSERVANDO..."
+            android:textColor="@color/hud_cyan"
+            android:textSize="9sp" />
+
+        <!-- Proactivity Controls Row -->
+        <LinearLayout
+            android:id="@+id/proactivityControlRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnProactivityMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="28dp"
+                android:background="@drawable/bg_hud_button_gold"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="5dp"
+                android:text="💡 AUTO: 50%"
+                android:textColor="@color/hud_yellow"
+                android:textSize="9.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnInsightsFeed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:minHeight="28dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="5dp"
+                android:text="✨ IDEIAS (0)"
+                android:textColor="@color/primary_accent"
+                android:textSize="9.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Middle Flexible Section: Activity Log + Content Panel -->
+    <LinearLayout
+        android:id="@+id/middleSection"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="4dp"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintTop_toBottomOf="@id/hologramSection">
+
+        <!-- TACTICAL GEORADAR HUD PANEL (Stand-by) -->
+        <com.evie.assistant.GeoRadarMapView
+            android:id="@+id/geoRadarMapView"
+            android:layout_width="match_parent"
+            android:layout_height="115dp"
+            android:layout_marginBottom="3dp"
+            android:visibility="gone" />
+
+        <!-- PROCEDURAL GENERATIVE UI CONTAINER (Stand-by) -->
+        <ScrollView
+            android:id="@+id/proceduralScrollView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/bg_hud_terminal"
+            android:fadeScrollbars="false"
+            android:fillViewport="true"
+            android:padding="5dp"
+            android:visibility="gone"
+            android:scrollbars="vertical">
+
+            <LinearLayout
+                android:id="@+id/proceduralCardsLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingBottom="4dp">
+
+                    <TextView
+                        android:id="@+id/tvProceduralHeader"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="monospace"
+                        android:text="❖ PROCEDURAL HUD INTERFACE"
+                        android:textColor="@color/hud_cyan"
+                        android:textSize="9.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/btnProceduralClear"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_hud_button_blue"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:fontFamily="monospace"
+                        android:gravity="center"
+                        android:paddingHorizontal="6dp"
+                        android:paddingVertical="2dp"
+                        android:text="✕"
+                        android:textColor="@color/primary_accent"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/proceduralCardsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ACTIVITY LOG Panel (With internal ScrollView) -->
+        <LinearLayout
+            android:id="@+id/activityLogPanel"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/bg_hud_terminal"
+            android:orientation="vertical"
+            android:padding="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="❖ ACTIVITY LOG"
+                android:textColor="@color/primary_accent"
+                android:textSize="9.5sp"
+                android:textStyle="bold" />
+
+            <!-- Internal ScrollView for Activity Log -->
+            <ScrollView
+                android:id="@+id/logScrollView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="3dp"
+                android:background="#050912"
+                android:fadeScrollbars="false"
+                android:fillViewport="true"
+                android:padding="4dp"
+                android:scrollbars="vertical">
+
+                <TextView
+                    android:id="@+id/tvActivityLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="1.5dp"
+                    android:text="SYS: JARVIS online - sleeping. Say 'Hey Jarvis' to wake me."
+                    android:textColor="@color/terminal_text"
+                    android:textSize="10sp" />
+            </ScrollView>
+        </LinearLayout>
+
+        <!-- AUXILIARY CONTENT PANEL (Search / News / Results - With internal ScrollView) -->
+        <LinearLayout
+            android:id="@+id/contentCardLayout"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_hud_terminal"
+            android:orientation="vertical"
+            android:padding="6dp"
+            android:visibility="gone">
+
+            <!-- Header with Title, Timestamp, and DISMISS Button (Transparent Blue Border) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvContentTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="monospace"
+                    android:text="◈ SEARCH / CONTENT"
+                    android:textColor="@color/primary_accent"
+                    android:textSize="9.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvContentTs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/text_dim"
+                    android:textSize="8sp" />
+
+                <TextView
+                    android:id="@+id/btnContentDismiss"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_hud_button_blue"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="monospace"
+                    android:gravity="center"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="3dp"
+                    android:text="DISMISS  ✕"
+                    android:textColor="@color/primary_accent"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Internal ScrollView for Content Body -->
+            <ScrollView
+                android:id="@+id/contentScrollView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="3dp"
+                android:background="#050912"
+                android:fadeScrollbars="false"
+                android:fillViewport="true"
+                android:padding="4dp"
+                android:scrollbars="vertical">
+
+                <TextView
+                    android:id="@+id/tvContentBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="1.5dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="9.5sp" />
+            </ScrollView>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Bottom Command Input & Action Buttons Bar -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#070C18"
+        android:orientation="vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingTop="3dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="2dp"
+            android:fontFamily="monospace"
+            android:text="❖ COMMAND INPUT"
+            android:textColor="@color/text_dim"
+            android:textSize="8.5sp" />
+
+        <!-- Input Field + Send Button (Blue Border) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_hud_input"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="1dp">
+
+            <EditText
+                android:id="@+id/etInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@null"
+                android:fontFamily="monospace"
+                android:hint="Type a command or question..."
+                android:imeOptions="actionSend"
+                android:inputType="textCapSentences|text"
+                android:paddingVertical="5dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_dim"
+                android:textSize="12sp" />
+
+            <ImageButton
+                android:id="@+id/btnSend"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:contentDescription="Send"
+                android:padding="4dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_menu_send"
+                app:tint="@color/primary_accent" />
+        </LinearLayout>
+
+        <!-- Action Button 1: INTERRUPT [ESC] (Transparent Background, Red Border & Text) -->
+        <Button
+            android:id="@+id/btnInterrupt"
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bg_hud_button_interrupt"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minHeight="0dp"
+            android:paddingVertical="0dp"
+            android:letterSpacing="0.08"
+            android:text="✋  INTERRUPT  [ESC]"
+            android:textAllCaps="false"
+            android:textColor="@color/hud_red"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <!-- Action Button 2: MICROPHONE (Transparent Background, Green Border/Text active, Red Border/Text muted) -->
+        <Button
+            android:id="@+id/btnMicToggle"
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_hud_button_interrupt"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minHeight="0dp"
+            android:paddingVertical="0dp"
+            android:letterSpacing="0.08"
+            android:text="🔇  MICROPHONE MUTED"
+            android:textAllCaps="false"
+            android:textColor="@color/hud_red"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

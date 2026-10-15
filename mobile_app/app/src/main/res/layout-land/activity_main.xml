@@ -1,0 +1,643 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark">
+
+    <!-- ========================================================================= -->
+    <!-- LEFT PANEL: Header + Sys Monitor + Hologram Sphere (Telemetry Cockpit)   -->
+    <!-- ========================================================================= -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/leftCockpitPanel"
+        android:layout_width="290dp"
+        android:layout_height="match_parent"
+        android:background="#050912"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="4dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Header Bar -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/headerLayout"
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:background="#070C18"
+            android:paddingHorizontal="6dp"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <!-- Buttons Left: Settings & Reconnect -->
+            <LinearLayout
+                android:id="@+id/headerActionsLeft"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <ImageButton
+                    android:id="@+id/btnSettings"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:background="@drawable/bg_hud_button_blue"
+                    android:contentDescription="Settings"
+                    android:padding="4dp"
+                    android:scaleType="centerInside"
+                    android:src="@android:drawable/ic_menu_preferences"
+                    app:tint="@color/primary_accent" />
+
+                <ImageButton
+                    android:id="@+id/btnReconnect"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/bg_hud_button_blue"
+                    android:contentDescription="Reconnect"
+                    android:padding="4dp"
+                    android:scaleType="centerInside"
+                    android:src="@android:drawable/ic_menu_rotate"
+                    app:tint="@color/primary_accent" />
+            </LinearLayout>
+
+            <!-- Center Logo -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/rightHeaderLayout"
+                app:layout_constraintStart_toEndOf="@id/headerActionsLeft"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <TextView
+                    android:id="@+id/tvLogo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:letterSpacing="0.2"
+                    android:text="EVIE"
+                    android:textColor="@color/primary_accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvSub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-light"
+                    android:letterSpacing="0.05"
+                    android:text="AI ASSISTANT"
+                    android:textColor="@color/text_dim"
+                    android:textSize="7sp" />
+            </LinearLayout>
+
+            <!-- Right: Status Dot, Online & Clock -->
+            <LinearLayout
+                android:id="@+id/rightHeaderLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:orientation="vertical"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="5dp"
+                        android:layout_height="5dp"
+                        android:background="@drawable/ic_launcher_background" />
+
+                    <TextView
+                        android:id="@+id/tvConnectionStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3dp"
+                        android:fontFamily="monospace"
+                        android:text="ONLINE"
+                        android:textColor="@color/hud_green"
+                        android:textSize="7.5sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvClock"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="10:59:51"
+                    android:textColor="@color/text_primary"
+                    android:textSize="9.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="Mon 12 Oct"
+                    android:textColor="@color/text_dim"
+                    android:textSize="7sp" />
+            </LinearLayout>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- SYS MONITOR Panel -->
+        <LinearLayout
+            android:id="@+id/sysMonitorPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/bg_hud_panel"
+            android:orientation="vertical"
+            android:padding="4dp"
+            app:layout_constraintTop_toBottomOf="@id/headerLayout">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="❖ SYS MONITOR"
+                android:textColor="@color/primary_accent"
+                android:textSize="8.5sp"
+                android:textStyle="bold" />
+
+            <!-- 4 Metrics Row (CPU, MEM, NET, GPU) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal"
+                android:weightSum="4">
+
+                <!-- CPU -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="#070E1A"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingVertical="2dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="CPU"
+                        android:textColor="@color/text_dim"
+                        android:textSize="6.5sp" />
+
+                    <TextView
+                        android:id="@+id/tvCpu"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="9%"
+                        android:textColor="@color/primary_accent"
+                        android:textSize="9.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- MEM -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="2dp"
+                    android:layout_weight="1"
+                    android:background="#070E1A"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingVertical="2dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="MEM"
+                        android:textColor="@color/text_dim"
+                        android:textSize="6.5sp" />
+
+                    <TextView
+                        android:id="@+id/tvMem"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="45%"
+                        android:textColor="@color/hud_yellow"
+                        android:textSize="9.5sp"
+                        android:textStyle="bold" />
+
+                    <ProgressBar
+                        android:id="@+id/pbMem"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="22dp"
+                        android:layout_height="2dp"
+                        android:layout_marginTop="1dp"
+                        android:max="100"
+                        android:progress="45"
+                        android:progressTint="@color/hud_yellow" />
+                </LinearLayout>
+
+                <!-- NET -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="2dp"
+                    android:layout_weight="1"
+                    android:background="#070E1A"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingVertical="2dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="NET"
+                        android:textColor="@color/text_dim"
+                        android:textSize="6.5sp" />
+
+                    <TextView
+                        android:id="@+id/tvNet"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="1.2MB/s"
+                        android:textColor="@color/hud_green"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- GPU -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="2dp"
+                    android:layout_weight="1"
+                    android:background="#070E1A"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingVertical="2dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="GPU"
+                        android:textColor="@color/text_dim"
+                        android:textSize="6.5sp" />
+
+                    <TextView
+                        android:id="@+id/tvGpu"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="1%"
+                        android:textColor="@color/hud_yellow"
+                        android:textSize="9.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Sub-bar UP / PROC / OS -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvUptime"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="monospace"
+                    android:text="UP 01:39"
+                    android:textColor="@color/hud_green"
+                    android:textSize="7sp" />
+
+                <TextView
+                    android:id="@+id/tvProc"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="monospace"
+                    android:gravity="center"
+                    android:text="PROC 261"
+                    android:textColor="@color/text_dim"
+                    android:textSize="7sp" />
+
+                <TextView
+                    android:id="@+id/tvOs"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="monospace"
+                    android:gravity="end"
+                    android:text="OS WIN"
+                    android:textColor="@color/hud_yellow"
+                    android:textSize="7sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Hologram 3D Sphere Section -->
+        <LinearLayout
+            android:id="@+id/hologramSection"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:gravity="center"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/sysMonitorPanel">
+
+            <com.evie.assistant.HologramSphereView
+                android:id="@+id/hologramCore"
+                android:layout_width="105dp"
+                android:layout_height="105dp" />
+
+            <!-- Status Indicator below Hologram -->
+            <TextView
+                android:id="@+id/tvCoreStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.15"
+                android:text="◉ MUTED"
+                android:textColor="@color/hud_red"
+                android:textSize="9.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Vertical Divider -->
+    <View
+        android:id="@+id/verticalCockpitDivider"
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="#152035"
+        app:layout_constraintStart_toEndOf="@id/leftCockpitPanel" />
+
+    <!-- ========================================================================= -->
+    <!-- RIGHT PANEL: Activity Log / Content + Command Input + Action Buttons      -->
+    <!-- ========================================================================= -->
+
+    <!-- Middle Flexible Section: Activity Log + Content Panel -->
+    <LinearLayout
+        android:id="@+id/middleSection"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="3dp"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/verticalCockpitDivider"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- ACTIVITY LOG Panel -->
+        <LinearLayout
+            android:id="@+id/activityLogPanel"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_hud_terminal"
+            android:orientation="vertical"
+            android:padding="5dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="❖ ACTIVITY LOG"
+                android:textColor="@color/primary_accent"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <!-- Internal ScrollView for Activity Log -->
+            <ScrollView
+                android:id="@+id/logScrollView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="2dp"
+                android:background="#050912"
+                android:fadeScrollbars="false"
+                android:fillViewport="true"
+                android:padding="4dp"
+                android:scrollbars="vertical">
+
+                <TextView
+                    android:id="@+id/tvActivityLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="1.5dp"
+                    android:text="SYS: JARVIS online - sleeping. Say 'Hey Jarvis' to wake me."
+                    android:textColor="@color/terminal_text"
+                    android:textSize="9.5sp" />
+            </ScrollView>
+        </LinearLayout>
+
+        <!-- AUXILIARY CONTENT PANEL (Search / News / Results) -->
+        <LinearLayout
+            android:id="@+id/contentCardLayout"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_hud_terminal"
+            android:orientation="vertical"
+            android:padding="5dp"
+            android:visibility="gone">
+
+            <!-- Header with Title, Timestamp, and DISMISS Button -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvContentTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="monospace"
+                    android:text="◈ SEARCH / CONTENT"
+                    android:textColor="@color/primary_accent"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvContentTs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/text_dim"
+                    android:textSize="7.5sp" />
+
+                <TextView
+                    android:id="@+id/btnContentDismiss"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_hud_button_blue"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="monospace"
+                    android:gravity="center"
+                    android:paddingHorizontal="7dp"
+                    android:paddingVertical="2dp"
+                    android:text="DISMISS  ✕"
+                    android:textColor="@color/primary_accent"
+                    android:textSize="8.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Internal ScrollView for Content Body -->
+            <ScrollView
+                android:id="@+id/contentScrollView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="2dp"
+                android:background="#050912"
+                android:fadeScrollbars="false"
+                android:fillViewport="true"
+                android:padding="4dp"
+                android:scrollbars="vertical">
+
+                <TextView
+                    android:id="@+id/tvContentBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="1.5dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="9sp" />
+            </ScrollView>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Bottom Command Input & Action Buttons Bar -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="#070C18"
+        android:orientation="vertical"
+        android:paddingHorizontal="6dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="4dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/verticalCockpitDivider">
+
+        <!-- Input Field + Send Button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_hud_input"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="5dp"
+            android:paddingVertical="1dp">
+
+            <EditText
+                android:id="@+id/etInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@null"
+                android:fontFamily="monospace"
+                android:hint="Type a command or question..."
+                android:imeOptions="actionSend"
+                android:inputType="textCapSentences|text"
+                android:paddingVertical="4dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_dim"
+                android:textSize="11sp" />
+
+            <ImageButton
+                android:id="@+id/btnSend"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:contentDescription="Send"
+                android:padding="3dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_menu_send"
+                app:tint="@color/primary_accent" />
+        </LinearLayout>
+
+        <!-- Horizontal Row with INTERRUPT and MICROPHONE Side-by-Side -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:orientation="horizontal"
+            android:weightSum="2">
+
+            <!-- INTERRUPT -->
+            <Button
+                android:id="@+id/btnInterrupt"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_hud_button_interrupt"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:paddingVertical="0dp"
+                android:letterSpacing="0.06"
+                android:text="✋  INTERRUPT  [ESC]"
+                android:textAllCaps="false"
+                android:textColor="@color/hud_red"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <!-- MICROPHONE TOGGLE -->
+            <Button
+                android:id="@+id/btnMicToggle"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_hud_button_interrupt"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:paddingVertical="0dp"
+                android:letterSpacing="0.06"
+                android:text="🔇  MICROPHONE MUTED"
+                android:textAllCaps="false"
+                android:textColor="@color/hud_red"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

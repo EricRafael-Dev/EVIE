@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Evie</string>
+    <string name="status_connected">Conectado via Tailscale</string>
+    <string name="status_disconnected">Desconectado</string>
+    <string name="hint_input">Fale ou envie um comando para a Evie…</string>
+    <string name="device_label">Dispositivo: poco-x7</string>
+</resources>

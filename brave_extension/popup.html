@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS Brave Controller</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-pulse"></div>
+        <div class="brand-text">
+          <span class="brand-title">JARVIS</span>
+          <span class="brand-sub">BRAVE ASSISTANT</span>
+        </div>
+      </div>
+      <div id="wsBadge" class="status-badge disconnected" title="Status da ponte WebSocket com o JARVIS">
+        <span class="status-dot"></span>
+        <span id="wsStatusText">OFFLINE</span>
+      </div>
+    </header>
+
+    <!-- Command / Search Bar -->
+    <div class="search-box">
+      <span class="search-icon">⚡</span>
+      <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="Buscar guia ou comando (:dup, :shot, :md)..." 
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <button id="clearSearchBtn" class="clear-btn" style="display: none;">✕</button>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="tabs">
+        <span class="nav-icon">📑</span> Guias (<span id="tabsCount">0</span>)
+      </button>
+      <button class="nav-tab" data-tab="extract">
+        <span class="nav-icon">📄</span> Extração
+      </button>
+      <button class="nav-tab" data-tab="capture">
+        <span class="nav-icon">📸</span> Captura
+      </button>
+      <button class="nav-tab" data-tab="settings">
+        <span class="nav-icon">⚙️</span> Conexão
+      </button>
+    </nav>
+
+    <!-- Main Content Panels -->
+    <main class="content-panel">
+      <!-- 1. PANEL: GUIAS -->
+      <section id="panel-tabs" class="tab-panel active">
+        <div class="batch-actions">
+          <button id="btnNewTab" class="action-chip" title="Abrir nova guia">
+            ➕ Nova
+          </button>
+          <button id="btnCloseDuplicates" class="action-chip warning" title="Fechar abas com o mesmo link">
+            🧹 Duplicadas
+          </button>
+          <button id="btnCloseDomain" class="action-chip danger" title="Fechar todas do domínio ativo">
+            🚫 Deste Domínio
+          </button>
+          <button id="btnToggleMedia" class="action-chip" title="Pausar ou dar play no YouTube em segundo plano">
+            ⏯️ YouTube
+          </button>
+          <button id="btnClipActiveTab" class="action-chip highlight" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; font-weight: 600; border: none; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);" title="Salvar e indexar página ativa no Second Brain da Evie">
+            🧠 Second Brain
+          </button>
+        </div>
+
+        <div id="tabsList" class="tabs-list">
+          <!-- Carregado dinamicamente -->
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Carregando guias ativas...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. PANEL: EXTRAÇÃO -->
+      <section id="panel-extract" class="tab-panel">
+        <div class="extract-grid">
+          <button class="extract-btn highlight" id="btnDirectClipSecondBrain" style="grid-column: span 2; border: 1px solid #6366f1; background: rgba(99, 102, 241, 0.12);">
+            <span class="btn-icon">🧠</span>
+            <div class="btn-info">
+              <strong style="color: #818cf8;">Clipar para o Second Brain (Evie)</strong>
+              <small>Extrai, resume e conecta com WikiLinks no Obsidian</small>
+            </div>
+          </button>
+
+          <button class="extract-btn" data-mode="article">
+            <span class="btn-icon">📄</span>
+            <div class="btn-info">
+              <strong>Artigo Limpo</strong>
+              <small>Texto em Markdown sem anúncios</small>
+            </div>
+          </button>
+
+          <button class="extract-btn" data-mode="metadata">
+            <span class="btn-icon">🏷️</span>
+            <div class="btn-info">
+              <strong>Metadados & SEO</strong>
+              <small>Título, descrições e OpenGraph</small>
+            </div>
+          </button>
+
+          <button class="extract-btn" data-mode="links">
+            <span class="btn-icon">🔗</span>
+            <div class="btn-info">
+              <strong>Todos os Links</strong>
+              <small>Lista completa de URLs e âncoras</small>
+            </div>
+          </button>
+
+          <button class="extract-btn" data-mode="tables">
+            <span class="btn-icon">📊</span>
+            <div class="btn-info">
+              <strong>Tabelas Estruturadas</strong>
+              <small>Dados tabulares em JSON / Markdown</small>
+            </div>
+          </button>
+
+          <button class="extract-btn" data-mode="forms">
+            <span class="btn-icon">📝</span>
+            <div class="btn-info">
+              <strong>Formulários & Campos</strong>
+              <small>Inputs, selects e valores preenchidos</small>
+            </div>
+          </button>
+
+          <button class="extract-btn" data-mode="selection">
+            <span class="btn-icon">✂️</span>
+            <div class="btn-info">
+              <strong>Texto Selecionado</strong>
+              <small>Apenas o trecho selecionado na tela</small>
+            </div>
+          </button>
+        </div>
+
+        <!-- Área de Resultados -->
+        <div id="extractResultArea" class="result-box" style="display: none;">
+          <div class="result-header">
+            <span id="resultTitle" class="result-title">Conteúdo Extraído</span>
+            <div class="result-actions">
+              <button id="btnCopyResult" class="tool-btn" title="Copiar tudo">📋 Copiar</button>
+              <button id="btnDownloadResult" class="tool-btn" title="Baixar arquivo">💾 Salvar</button>
+              <button id="btnClipToSecondBrain" class="tool-btn" style="background:#4f46e5;color:#fff;" title="Salvar no Second Brain">🧠 Second Brain</button>
+            </div>
+          </div>
+          <pre id="resultOutput" class="result-output"></pre>
+        </div>
+      </section>
+
+      <!-- 3. PANEL: CAPTURA -->
+      <section id="panel-capture" class="tab-panel">
+        <div class="capture-controls">
+          <button id="btnTakeScreenshot" class="primary-btn">
+            📸 Capturar Aba Ativa Agora
+          </button>
+        </div>
+
+        <div id="screenshotPreviewArea" class="screenshot-preview" style="display: none;">
+          <img id="screenshotImg" alt="Screenshot" />
+          <div class="screenshot-actions">
+            <button id="btnCopyScreenshot" class="tool-btn">📋 Copiar Imagem</button>
+            <button id="btnDownloadScreenshot" class="tool-btn">💾 Baixar PNG</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. PANEL: CONEXÃO COM JARVIS -->
+      <section id="panel-settings" class="tab-panel">
+        <div class="settings-card">
+          <label for="wsUrlInput" class="input-label">Servidor WebSocket do JARVIS (Python)</label>
+          <div class="input-group">
+            <input 
+              type="text" 
+              id="wsUrlInput" 
+              value="ws://127.0.0.1:8765" 
+              placeholder="ws://127.0.0.1:8765" 
+            />
+            <button id="btnSaveWs" class="primary-btn small">Salvar</button>
+          </div>
+          <p class="settings-help">
+            Permite que o JARVIS (Python) no seu computador envie comandos em tempo real para alternar abas, fechar guias, extrair conteúdo e tirar prints no Brave.
+          </p>
+        </div>
+
+        <div class="logs-card">
+          <div class="logs-header">
+            <span>Atividade & Conexão</span>
+            <button id="btnClearLogs" class="clear-logs-btn">Limpar</button>
+          </div>
+          <div id="activityLogs" class="logs-output">
+            <div class="log-entry sys">Extensão pronta. Aguardando servidor JARVIS...</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer Feedback Notification -->
+    <div id="toast" class="toast">Mensagem</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

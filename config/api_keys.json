@@ -1,0 +1,16 @@
+{
+    "gemini_api_key": "AIzaSyCGsy3JC2-DAVNxQ5Ngou0Xp3tmnC5mE68",
+    "os_system": "windows",
+    "voice_name": "Aoede",
+    "assistant_name": "Evie",
+    "user_name": "Rafael",
+    "ui_color": "#00d4ff",
+    "hud_style": "face",
+    "wake_word_enabled": true,
+    "input_device": "Microfone (Fifine Microphone)",
+    "output_device": "",
+    "camera_index": 0,
+    "plugins_enabled": {
+        "brave_controller": true
+    }
+}

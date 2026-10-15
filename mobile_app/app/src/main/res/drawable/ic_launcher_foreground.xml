@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer Arc Segment 1 -->
+    <path
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M 54,28 A 26,26 0 0,1 80,54" />
+
+    <!-- Outer Arc Segment 2 -->
+    <path
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M 54,80 A 26,26 0 0,1 28,54" />
+
+    <!-- Dotted / dashed intermediate HUD ring -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M 72,54 A 18,18 0 1,1 36,54 A 18,18 0 1,1 72,54" />
+
+    <!-- Diagonal Orbital Ellipse (Tilted HUD Ring) -->
+    <path
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="1.5"
+        android:pathData="M 34,40 C 44,28 64,34 74,46 C 84,58 74,78 54,78 C 34,78 24,52 34,40 Z" />
+
+    <!-- Core Glowing Disc -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M 54,48 A 6,6 0 1,1 53.9,48 Z" />
+
+    <!-- Center Bright Hotspot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 54,51 A 3,3 0 1,1 53.9,51 Z" />
+
+    <!-- HUD Targeting Crosshair Notches -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M 54,20 L 54,24 M 54,84 L 54,88 M 20,54 L 24,54 M 84,54 L 88,54" />
+
+    <!-- Triangular sci-fi markers -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M 54,23 L 52,25 L 56,25 Z M 54,85 L 52,83 L 56,83 Z" />
+
+</vector>
