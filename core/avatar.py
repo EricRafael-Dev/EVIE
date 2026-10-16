@@ -554,8 +554,10 @@ class EvieEyesAvatar:
                 self.face.poke()
             # Não zera a expressão se uma emoção ativa (happy, love, etc.) estiver em andamento
         elif st in ("IDLE_OBSERVING", "NEUTRAL"):
-            if (self.face._revert_in is None or self.face._revert_in <= 0) and not getattr(self.face.dance, "dancing", False):
-                if self.face.expression not in ("happy", "love", "excited", "sad", "angry", "wink", "surprised"):
+            if not getattr(self.face.dance, "dancing", False):
+                if self.face._revert_in is not None and self.face._revert_in <= 0:
+                    self.set_expression("neutral")
+                elif self.face._revert_in is None and self.face.expression not in ("love", "excited", "sad", "angry"):
                     self.set_expression("neutral")
 
     def set_emotion(self, emotion: str) -> None:
@@ -623,6 +625,11 @@ class EvieEyesAvatar:
     def blink_now(self, double: bool = False) -> None:
         self.face.blink_now(double=double)
 
+    def hop(self, strength: float = 1.0) -> None:
+        """Pulinho elástico nos olhos (HopLayer) com amortecimento suave."""
+        if hasattr(self, "face") and hasattr(self.face, "hop"):
+            self.face.hop.kick(strength)
+
     def poke(self) -> None:
         """Cutuca/interage com a Evie: acorda se estiver dormindo e zera o tédio."""
         self.face.poke()
@@ -682,6 +689,8 @@ class EvieEyesAvatar:
             self.face.breathing.reset_defaults()
 
         self.face.update(dt)
+        if self.face.expression == "neutral" and self._emotion != "neutral":
+            self._emotion = "neutral"
 
     def paint(self, p: QPainter, cx: float, cy: float, r: float,
               primary: QColor, accent: QColor, bg: QColor) -> None:

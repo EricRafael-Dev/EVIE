@@ -2,24 +2,30 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from ..model.params import EyeParams
+try:
+    from evie_eyes.model.params import EyeParams
+except ImportError:
+    from ..model.params import EyeParams
 
 if TYPE_CHECKING:
-    from ..face import Face
+    try:
+        from evie_eyes.face import Face
+    except ImportError:
+        from ..face import Face
 
 
 class DanceLayer:
     """Camada de dança rítmica com olhos felizes (^ ^), trajetória em arco a 120 BPM e balanço lateral."""
 
-    def __init__(self, face: "Face", bpm: float = 120.0):
+    def __init__(self, face: Face, bpm: float = 120.0):
         self.face = face
         self.bpm = bpm
         self.enabled = False
         self._time = 0.0
         self._duration = 0.0
-        self._prev_expression: Optional[str] = None
+        self._prev_expression: str | None = None
 
     @property
     def dancing(self) -> bool:
@@ -30,12 +36,20 @@ class DanceLayer:
         self.enabled = True
         self._time = 0.0
         self._duration = duration
-        self._prev_expression = self.face.expression
-        self.face.set_expression("happy")
+        prev = self.face.expression
+        # Se a expressão anterior já era temporária (happy, wink) ou tinha revert_in ativo,
+        # o destino após a dança deve ser 'neutral' para nunca congelar
+        if prev in ("happy", "wink", "wink_left", "wink_right") or (self.face._revert_in is not None and self.face._revert_in > 0):
+            self._prev_expression = "neutral"
+        else:
+            self._prev_expression = prev
+        self.face.set_expression("happy", duration=duration + 0.1)
         # Dispara partículas festivas se existirem
-        if hasattr(self.face, "fx") and hasattr(self.face.fx, "burst"):
+        if hasattr(self.face, "fx"):
             try:
-                self.face.fx.burst("star", 10)
+                burst_fn = getattr(self.face.fx, "burst", None)
+                if callable(burst_fn):
+                    burst_fn("star", 10)
             except Exception:
                 pass
 
@@ -44,9 +58,8 @@ class DanceLayer:
         if self.enabled:
             self.enabled = False
             self._duration = 0.0
-            if self.face.expression == "happy":
-                prev = self._prev_expression or "neutral"
-                self.face.set_expression(prev, source="idle")
+            prev = self._prev_expression or "neutral"
+            self.face.set_expression(prev, duration=None, source="user")
             # Pisca na transição para o estado normal
             if hasattr(self.face, "blink_now"):
                 self.face.blink_now()

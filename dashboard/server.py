@@ -53,11 +53,13 @@ if getattr(sys, "stderr", None) is None:
 _DEPS_OK = False
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
-    from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+    from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response, StreamingResponse
     import uvicorn
     _DEPS_OK = True
 except ImportError:
-    pass
+    FastAPI = WebSocket = WebSocketDisconnect = Request = None  # type: ignore
+    HTMLResponse = JSONResponse = FileResponse = Response = StreamingResponse = None  # type: ignore
+    uvicorn = None  # type: ignore
 
 # python-multipart is required for file uploads — optional dependency
 _UPLOAD_OK = False
@@ -503,7 +505,8 @@ async def _process_clipped_content(url: str, title: str, content: str) -> None:
             f"3. Lista de entidades e tópicos-chave para conexão de conhecimento."
         )
 
-        resumo = await aroute_generate(prompt=prompt, ladder=ROUTE_FAST)
+        route_res = await aroute_generate(route=ROUTE_FAST, contents=prompt)
+        resumo = getattr(route_res.response, "text", str(route_res.response or "")).strip()
 
         # Cross-reference with existing second_brain notes
         related_fts = search_second_brain(title, limit=3)
@@ -658,7 +661,8 @@ class DashboardServer:
     # ── broadcast ────────────────────────────────────────────────────────
 
     async def broadcast(self, msg: dict) -> None:
-        if msg.get("type") != "file_download":
+        mtype = msg.get("type")
+        if mtype not in ("file_download", "remote_desktop_authorized", "remote_desktop_request", "confirm_resolved", "confirm_request", "audio_stream", "audio", "audio_end"):
             self._history.append(msg)
             if len(self._history) > 300:
                 self._history = self._history[-300:]
@@ -670,6 +674,136 @@ class DashboardServer:
             except Exception:
                 dead.add(ws)
         self._clients -= dead
+
+    # ── Remote Desktop & Multi-Monitor SpaceView Core ────────────────────────
+
+    @staticmethod
+    def _get_system_monitors() -> list[dict]:
+        """Descobre todos os monitores conectados com suas resoluções e posições absolutas."""
+        try:
+            from PyQt6.QtWidgets import QApplication
+            from PyQt6.QtGui import QGuiApplication
+            app = QApplication.instance()
+            if app is None:
+                import sys
+                app = QApplication(sys.argv)
+            screens = QGuiApplication.screens()
+            monitors = []
+            for i, s in enumerate(screens):
+                geo = s.geometry()
+                monitors.append({
+                    "index": i,
+                    "name": f"Monitor {i + 1}" + (" (Principal)" if i == 0 else " (Secundário)"),
+                    "width": geo.width(),
+                    "height": geo.height(),
+                    "x": geo.x(),
+                    "y": geo.y(),
+                    "primary": (i == 0)
+                })
+            return monitors
+        except Exception as exc:
+            print(f"[RemoteDesktop] Erro ao enumerar telas: {exc}")
+            return [{"index": 0, "name": "Monitor 1 (Principal)", "width": 1920, "height": 1080, "x": 0, "y": 0, "primary": True}]
+
+    @staticmethod
+    def _capture_monitor_jpeg(monitor_idx: int = 0, quality: int = 82, max_w: int = 2560) -> bytes:
+        """Captura um frame de tela de alta performance do monitor solicitado em resolução nítida (mínimo 1080p)."""
+        try:
+            from PyQt6.QtWidgets import QApplication
+            from PyQt6.QtGui import QGuiApplication
+            from PyQt6.QtCore import QBuffer, QByteArray, QIODevice, Qt
+            app = QApplication.instance()
+            if app is None:
+                import sys
+                app = QApplication(sys.argv)
+            screens = QGuiApplication.screens()
+            if not screens:
+                return b""
+            idx = monitor_idx if 0 <= monitor_idx < len(screens) else 0
+            s = screens[idx]
+            pix = s.grabWindow(0)
+            target_w = max(2560, max_w) if max_w >= 1920 else 2560
+            if pix.width() > target_w:
+                pix = pix.scaledToWidth(target_w, Qt.TransformationMode.FastTransformation)
+            ba = QByteArray()
+            buf = QBuffer(ba)
+            buf.open(QIODevice.OpenModeFlag.WriteOnly)
+            q = max(70, min(95, quality if quality >= 70 else 82))
+            pix.save(buf, "JPEG", q)
+            return bytes(ba.data())
+        except Exception as exc:
+            print(f"[RemoteDesktop] Erro na captura de frame da tela {monitor_idx}: {exc}")
+            return b""
+
+    @staticmethod
+    def _execute_remote_input(data: dict) -> None:
+        """Executa cliques, movimentos, rolagem e digitação no PC mapeando as coordenadas para o monitor."""
+        try:
+            action = str(data.get("action", "click")).lower()
+            mon_idx = int(data.get("monitor", 0))
+            norm_x = float(data.get("x", 0.5))
+            norm_y = float(data.get("y", 0.5))
+
+            from PyQt6.QtWidgets import QApplication
+            from PyQt6.QtGui import QGuiApplication
+            app = QApplication.instance()
+            if app is None:
+                import sys
+                app = QApplication(sys.argv)
+            screens = QGuiApplication.screens()
+            if not screens:
+                return
+
+            idx = mon_idx if 0 <= mon_idx < len(screens) else 0
+            geo = screens[idx].geometry()
+
+            abs_x = geo.x() + int(norm_x * geo.width())
+            abs_y = geo.y() + int(norm_y * geo.height())
+
+            import pyautogui
+            pyautogui.FAILSAFE = False
+
+            if action == "move":
+                pyautogui.moveTo(abs_x, abs_y)
+            elif action == "click":
+                pyautogui.moveTo(abs_x, abs_y)
+                pyautogui.click()
+            elif action == "right_click":
+                pyautogui.moveTo(abs_x, abs_y)
+                pyautogui.rightClick()
+            elif action == "double_click":
+                pyautogui.moveTo(abs_x, abs_y)
+                pyautogui.doubleClick()
+            elif action == "down":
+                pyautogui.moveTo(abs_x, abs_y)
+                pyautogui.mouseDown()
+            elif action == "up":
+                pyautogui.moveTo(abs_x, abs_y)
+                pyautogui.mouseUp()
+            elif action == "scroll":
+                dy = int(data.get("dy", 0))
+                if dy != 0:
+                    pyautogui.scroll(dy)
+            elif action in ("text", "type"):
+                txt = str(data.get("text", ""))
+                if txt:
+                    try:
+                        import pyperclip
+                        pyperclip.copy(txt)
+                        pyautogui.hotkey("ctrl", "v")
+                    except Exception:
+                        pyautogui.write(txt)
+            elif action == "key":
+                k = str(data.get("key", "")).lower()
+                if k:
+                    if k in ("return", "enter"):
+                        pyautogui.press("enter")
+                    elif k in ("backspace", "delete", "tab", "escape", "up", "down", "left", "right"):
+                        pyautogui.press(k)
+                    else:
+                        pyautogui.press(k)
+        except Exception as exc:
+            print(f"[RemoteDesktop] Falha ao processar input remoto: {exc}")
 
     # ── FastAPI app ───────────────────────────────────────────────────────
 
@@ -1106,7 +1240,7 @@ class DashboardServer:
             if not isinstance(notes, list):
                 return JSONResponse({"error": "Formato inválido. Esperada lista de notas."}, status_code=400)
 
-            from memory.memory_worker import MemoryIngestionWorker
+            from agent_memory.extractor import MemoryIngestionWorker
             worker = MemoryIngestionWorker.get_instance()
             synced = 0
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1123,7 +1257,7 @@ class DashboardServer:
                     txt = (item.get("text") or item.get("content") or "").strip()
                     ts = item.get("timestamp") or now_str
                 if txt:
-                    worker.extract_facts_in_background(f"[Nota Offline de {device_id} ({ts})]: {txt}")
+                    asyncio.create_task(worker.extract_facts_in_background(f"[Nota Offline de {device_id} ({ts})]: {txt}"))
                     slug = re.sub(r'[^\w\-]', '_', txt[:30]).strip('_') or f"offline_{int(time.time())}"
                     note_file = notas_dir / f"nota_offline_{slug}.md"
                     note_content = (
@@ -1342,6 +1476,64 @@ class DashboardServer:
                 return JSONResponse({"error": "Conteúdo vazio"}, status_code=400)
             asyncio.create_task(_process_clipped_content(url, title, content))
             return JSONResponse({"ok": True, "message": f"Artigo '{title}' enfileirado para processamento."})
+
+        # ── Remote Desktop & Multi-Monitor Endpoints ─────────────────────────
+
+        @app.get("/api/remote_desktop/monitors")
+        async def remote_desktop_monitors_ep(req: Request):
+            if not _auth(req):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            monitors = await asyncio.to_thread(self._get_system_monitors)
+            return JSONResponse({"ok": True, "monitors": monitors, "count": len(monitors)})
+
+        @app.get("/api/remote_desktop/frame")
+        async def remote_desktop_frame_ep(req: Request, monitor: int = 0, quality: int = 82, width: int = 2560):
+            if not _auth(req):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            jpeg_bytes = await asyncio.to_thread(self._capture_monitor_jpeg, monitor, quality, width)
+            if not jpeg_bytes:
+                return JSONResponse({"error": "Failed to capture screen"}, status_code=500)
+            return Response(content=jpeg_bytes, media_type="image/jpeg")
+
+        @app.get("/stream/remote_desktop")
+        async def remote_desktop_stream_ep(req: Request, monitor: int = 0, quality: int = 82, width: int = 2560, fps: int = 25):
+            if not _auth(req):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+            async def _stream_gen():
+                interval = 1.0 / max(1, min(60, fps))
+                while True:
+                    t0 = asyncio.get_event_loop().time()
+                    jpeg = await asyncio.to_thread(self._capture_monitor_jpeg, monitor, quality, width)
+                    if jpeg:
+                        yield (
+                            b"--frame\r\n"
+                            b"Content-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
+                        )
+                    elapsed = asyncio.get_event_loop().time() - t0
+                    sleep_t = max(0.015, interval - elapsed)
+                    await asyncio.sleep(sleep_t)
+
+            return StreamingResponse(_stream_gen(), media_type="multipart/x-mixed-replace; boundary=frame")
+
+        @app.post("/api/remote_desktop/input")
+        async def remote_desktop_input_ep(req: Request):
+            if not _auth(req):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            try:
+                body = await req.json()
+            except Exception:
+                return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+            await asyncio.to_thread(self._execute_remote_input, body)
+            return JSONResponse({"ok": True})
+
+        @app.post("/api/remote_desktop/request")
+        async def remote_desktop_request_ep(req: Request):
+            if not _auth(req):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            from actions.computer_settings import _remote_desktop_connect
+            _remote_desktop_connect()
+            return JSONResponse({"ok": True, "status": "authorized", "message": "Conexão de Área de Trabalho Remota autorizada."})
 
         # ── Tablet Whiteboard WebSocket ──────────────────────────────────────
 
@@ -1580,6 +1772,11 @@ class DashboardServer:
                                 disp(action_id, payload)
                         except Exception as _e:
                             print(f"[Dashboard] ws ui_action error: {_e}")
+                    elif mtype == "remote_input":
+                        await asyncio.to_thread(self._execute_remote_input, data)
+                    elif mtype == "remote_desktop_request":
+                        from actions.computer_settings import _remote_desktop_connect
+                        _remote_desktop_connect()
                     elif mtype in ("geo_location", "mobile_telemetry", "location_sync"):
                         lat = data.get("lat") or data.get("latitude")
                         lon = data.get("lon") or data.get("longitude")
@@ -1697,9 +1894,12 @@ class DashboardServer:
             try:
                 await uvicorn.Server(cfg).serve()
                 break
-            except OSError as e:
-                print(f"[Dashboard] Port {PORT + 1} busy ({e}), retrying in 2s ({attempt+1}/5)...")
+            except (OSError, SystemExit) as e:
+                print(f"[Dashboard] Port {PORT + 1} busy or failed ({e}), retrying in 2s ({attempt+1}/5)...")
                 await asyncio.sleep(2)
+            except Exception as e:
+                print(f"[Dashboard] Port {PORT + 1} error: {e}")
+                break
 
     async def _serve_http_alias(self) -> None:
         """Plain HTTP server on PORT+2 (8002) exclusively on 127.0.0.1 for local browser extension."""
@@ -1711,6 +1911,8 @@ class DashboardServer:
             )
             print(f"[Dashboard] Plain HTTP (Localhost only): http://127.0.0.1:{PORT + 2}")
             await uvicorn.Server(cfg).serve()
+        except (OSError, SystemExit) as e:
+            print(f"[Dashboard] Port {PORT + 2} busy or failed ({e})")
         except Exception as e:
             print(f"[Dashboard] Port {PORT + 2} error: {e}")
 
@@ -1740,12 +1942,18 @@ class DashboardServer:
             asyncio.create_task(self._serve_alias())
             asyncio.create_task(self._serve_http_alias())
 
-        cfg = uvicorn.Config(
-            self.app, host="0.0.0.0", port=PORT, log_level="warning",
-            lifespan="off",
-            log_config=None,
-            **({"ssl_keyfile": str(ssl_key), "ssl_certfile": str(ssl_cert)} if use_ssl else {}),
-        )
+        cfg_kwargs = {
+            "app": self.app,
+            "host": "0.0.0.0",
+            "port": PORT,
+            "log_level": "warning",
+            "lifespan": "off",
+            "log_config": None,
+        }
+        if use_ssl:
+            cfg_kwargs["ssl_keyfile"] = str(ssl_key)
+            cfg_kwargs["ssl_certfile"] = str(ssl_cert)
+        cfg = uvicorn.Config(**cfg_kwargs)  # type: ignore
 
         proto = "https" if use_ssl else "http"
         print(f"[Dashboard] {proto}://{self._ip}:{PORT}")
@@ -1754,14 +1962,16 @@ class DashboardServer:
             try:
                 await uvicorn.Server(cfg).serve()
                 break
-            except OSError as e:
-                print(f"[Dashboard] Port {PORT} busy ({e}), retrying in 2s ({attempt+1}/5)...")
+            except (OSError, SystemExit) as e:
+                print(f"[Dashboard] Port {PORT} busy or failed ({e}), retrying in 2s ({attempt+1}/5)...")
                 await asyncio.sleep(2)
+            except Exception as e:
+                print(f"[Dashboard] Server error: {e}")
+                break
 
 
 def broadcast_file_download(filename: str, url: str, size: int, size_str: str = "", http_url: str = "") -> bool:
     """Dispara evento WebSocket para celulares (Poco X7 / app) baixarem o arquivo automaticamente."""
-    global _SERVER_INSTANCE
     if _SERVER_INSTANCE:
         loop = getattr(_SERVER_INSTANCE, "_loop", None)
         if not loop or not loop.is_running():

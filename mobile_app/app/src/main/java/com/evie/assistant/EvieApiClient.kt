@@ -486,6 +486,14 @@ class EvieApiClient(private val config: DeviceConfig) {
         return ws
     }
 
+    fun sendWebSocketJson(json: JsonObject): Boolean {
+        return try {
+            activeWebSocket?.send(json.toString()) ?: false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun disconnect() {
         activeWebSocket?.close(1000, "App closed")
         activeWebSocket = null

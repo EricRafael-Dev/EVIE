@@ -40,6 +40,14 @@ class MemoryIngestionWorker:
     sem onerar o tempo de resposta do modelo primário.
     """
 
+    _instance: MemoryIngestionWorker | None = None
+
+    @classmethod
+    def get_instance(cls) -> MemoryIngestionWorker:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
     def __init__(
         self,
         tool_manager: MemoryToolManager | None = None,
@@ -47,6 +55,7 @@ class MemoryIngestionWorker:
     ) -> None:
         self.tool_manager = tool_manager or MemoryToolManager()
         self.indexer = indexer or MemorySearchEngine()
+        MemoryIngestionWorker._instance = self
 
     async def extract_facts_in_background(self, conversation_turn: str) -> dict[str, Any]:
         """Disparado via asyncio.create_task para analisar o turno da conversa e gravar

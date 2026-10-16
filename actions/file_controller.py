@@ -1,6 +1,8 @@
 import os
+import sys
 import shutil
 import platform
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -66,13 +68,7 @@ def _undo_write(target: Path, previous: str | None):
 
 
 def _restore_from_trash(original: Path) -> str:
-    """Best-effort undelete.
-
-    delete_file uses send2trash, which is the right call: the file lands in the
-    Recycle Bin / Trash where the person can also find it themselves. Getting it
-    back out again is shell work and only reliable on Windows, where pywin32 is
-    already a dependency. Everywhere else this says where the file is instead of
-    pretending it failed — the file is not lost either way."""
+    """Best-effort undelete."""
     if _OS == "Windows":
         try:
             import win32com.client
@@ -90,91 +86,172 @@ def _restore_from_trash(original: Path) -> str:
             f"automatically, but it is there and can be restored by hand.")
 
 
-_SAFE_ROOTS: list[Path] = [
-    Path.home(),
-]
+_CRITICAL_SYSTEM_DIRS = {
+    Path("C:/Windows"),
+    Path("C:/Windows/System32"),
+    Path("C:/Program Files"),
+    Path("C:/Program Files (x86)"),
+    Path("C:/$Recycle.Bin"),
+    Path("/bin"),
+    Path("/sbin"),
+    Path("/usr/bin"),
+    Path("/usr/sbin"),
+    Path("/etc"),
+}
+
 
 def _is_safe_path(target: Path) -> bool:
-    """Is the given path inside _SAFE_ROOTS? If not, reject the operation."""
+    """Verifies that the target path does not touch critical operating system folders."""
     try:
         resolved = target.resolve()
-        return any(
-            resolved == root.resolve() or resolved.is_relative_to(root.resolve())
-            for root in _SAFE_ROOTS
-        )
+        for crit in _CRITICAL_SYSTEM_DIRS:
+            try:
+                crit_resolved = crit.resolve()
+                if resolved == crit_resolved or resolved.is_relative_to(crit_resolved):
+                    return False
+            except Exception:
+                continue
+        return True
     except Exception:
         return False
+
+
+def _get_onedrive_path() -> Path | None:
+    for cand in [Path.home() / "OneDrive", Path.home() / "OneDrive - Personal"]:
+        if cand.exists():
+            return cand
+    return None
+
 
 def _get_desktop() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_DESKTOP_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    od = _get_onedrive_path()
+    if od:
+        for name in ("Desktop", "Área de Trabalho", "Area de Trabalho"):
+            if (od / name).exists():
+                return od / name
+    for name in ("Desktop", "Área de Trabalho", "Area de Trabalho"):
+        if (Path.home() / name).exists():
+            return Path.home() / name
     return Path.home() / "Desktop"
+
 
 def _get_downloads() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_DOWNLOAD_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    for name in ("Downloads", "Transferências", "Transferencias"):
+        if (Path.home() / name).exists():
+            return Path.home() / name
     return Path.home() / "Downloads"
+
 
 def _get_documents() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_DOCUMENTS_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    od = _get_onedrive_path()
+    if od:
+        for name in ("Documents", "Documentos"):
+            if (od / name).exists():
+                return od / name
+    for name in ("Documents", "Documentos"):
+        if (Path.home() / name).exists():
+            return Path.home() / name
     return Path.home() / "Documents"
+
 
 def _get_pictures() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_PICTURES_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    od = _get_onedrive_path()
+    if od:
+        for name in ("Pictures", "Imagens"):
+            if (od / name).exists():
+                return od / name
+    for name in ("Pictures", "Imagens"):
+        if (Path.home() / name).exists():
+            return Path.home() / name
     return Path.home() / "Pictures"
+
 
 def _get_music() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_MUSIC_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    for name in ("Music", "Músicas", "Musicas"):
+        if (Path.home() / name).exists():
+            return Path.home() / name
     return Path.home() / "Music"
+
 
 def _get_videos() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_VIDEOS_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    for name in ("Videos", "Vídeos"):
+        if (Path.home() / name).exists():
+            return Path.home() / name
     return Path.home() / "Videos"
 
 
 def _resolve_path(raw: str) -> Path:
+    if not raw or str(raw).strip() in ("", ".", "here", "current"):
+        return Path.cwd()
+
+    project_dir = Path(__file__).resolve().parent.parent
+
     shortcuts: dict[str, Path] = {
-        "desktop":   _get_desktop(),
-        "downloads": _get_downloads(),
-        "documents": _get_documents(),
-        "pictures":  _get_pictures(),
-        "music":     _get_music(),
-        "videos":    _get_videos(),
-        "home":      Path.home(),
+        "desktop":            _get_desktop(),
+        "área de trabalho":   _get_desktop(),
+        "area de trabalho":   _get_desktop(),
+        "downloads":          _get_downloads(),
+        "transferências":     _get_downloads(),
+        "transferencias":     _get_downloads(),
+        "documents":          _get_documents(),
+        "documentos":         _get_documents(),
+        "meus documentos":    _get_documents(),
+        "pictures":           _get_pictures(),
+        "imagens":            _get_pictures(),
+        "fotos":              _get_pictures(),
+        "music":              _get_music(),
+        "músicas":            _get_music(),
+        "musicas":            _get_music(),
+        "videos":             _get_videos(),
+        "vídeos":             _get_videos(),
+        "home":               Path.home(),
+        "userprofile":        Path.home(),
+        "usuario":            Path.home(),
+        "workspace":          project_dir,
+        "project":            project_dir,
+        "mark-lv":            project_dir,
+        "mark-lv-main":       project_dir,
     }
-    raw   = raw.strip().strip('"').strip("'")
+    od = _get_onedrive_path()
+    if od:
+        shortcuts["onedrive"] = od
+
+    raw = raw.strip().strip('"').strip("'")
     lower = raw.lower()
     if lower in shortcuts:
         return shortcuts[lower]
 
-    # "desktop/notes/a.md" and "desktop\notes\a.md" — a shortcut followed by a
-    # sub-path.  Without this branch the whole string falls through to the
-    # relative-path return below and is resolved against the process CWD instead
-    # of the real Desktop: an "Access denied" when the project lives outside the
-    # home directory, or — worse — a silent write into a stray "desktop" folder
-    # inside the project when it lives inside it.
     head, sep, rest = raw.replace("\\", "/").partition("/")
     if sep and head.lower() in shortcuts:
         rest = rest.strip("/")
         return shortcuts[head.lower()] / rest if rest else shortcuts[head.lower()]
 
-    return Path(raw).expanduser()
+    expanded = os.path.expandvars(os.path.expanduser(raw))
+    return Path(expanded)
 
 def _format_size(b: int) -> str:
     for unit in ["B", "KB", "MB", "GB", "TB"]:
@@ -450,8 +527,23 @@ def write_file(path: str, name: str = "", content: str = "",
         return f"Could not write file: {e}"
 
 
-def find_files(name: str = "", extension: str = "",
-               path: str = "home", max_results: int = 20) -> str:
+_SKIP_DIR_NAMES = {
+    ".git", ".svn", ".hg", "node_modules", ".venv", "venv", "env",
+    "__pycache__", ".ruff_cache", ".idea", ".vscode",
+    "$recycle.bin", "system volume information",
+}
+
+def find_files(
+    name: str = "",
+    extension: str = "",
+    path: str = "home",
+    target_type: str = "any",
+    max_results: int = 25
+) -> str:
+    """
+    Busca inteligente de arquivos e/ou pastas no sistema de arquivos.
+    target_type pode ser 'any' (arquivos e pastas), 'folder' (apenas pastas), ou 'file' (apenas arquivos).
+    """
     try:
         search_path = _resolve_path(path)
         if not _is_safe_path(search_path):
@@ -459,32 +551,67 @@ def find_files(name: str = "", extension: str = "",
         if not search_path.exists():
             return f"Search path not found: {path}"
 
-        results    = []
-        dir_count  = 0
-        max_dirs   = 500  # performance + safety limit
+        results = []
+        name_lower = name.lower().strip()
+        ext_lower = extension.lower().strip()
+        if ext_lower and not ext_lower.startswith("."):
+            ext_lower = f".{ext_lower}"
+        target_type = (target_type or "any").lower().strip()
 
-        for item in search_path.rglob("*"):
-            if item.is_dir():
-                dir_count += 1
-                if dir_count > max_dirs:
-                    break
-                continue
-            if not item.is_file():
-                continue
-            if extension and item.suffix.lower() != extension.lower():
-                continue
-            if name and name.lower() not in item.name.lower():
-                continue
-            size = _format_size(item.stat().st_size)
-            results.append(f"📄 {item.name} ({size}) — {item.parent}")
-            if len(results) >= max_results:
+        start_time = time.time()
+        timeout_seconds = 6.0
+        scanned_dirs = 0
+
+        for root, dirs, files in os.walk(str(search_path), topdown=True):
+            if time.time() - start_time > timeout_seconds:
                 break
 
-        if not results:
-            query = name or extension or "files"
-            return f"No {query} found in {search_path.name}/"
+            scanned_dirs += 1
+            # Poda diretórios desnecessários e gigantescos para busca ultrarrápida
+            dirs[:] = [
+                d for d in dirs
+                if d.lower() not in _SKIP_DIR_NAMES
+                and not d.startswith(".")
+                and not (d.lower() == "temp" and "appdata" in root.lower())
+            ]
 
-        return f"Found {len(results)} file(s):\n" + "\n".join(results)
+            # 1. Correspondência de Pastas
+            if target_type in ("folder", "any") and name_lower:
+                for d in dirs:
+                    if name_lower in d.lower():
+                        folder_path = Path(root) / d
+                        results.append(f"[PASTA] {d}/ -> {folder_path}")
+                        if len(results) >= max_results:
+                            break
+                if len(results) >= max_results:
+                    break
+
+            # 2. Correspondência de Arquivos
+            if target_type in ("file", "any"):
+                for f in files:
+                    f_lower = f.lower()
+                    if ext_lower and not f_lower.endswith(ext_lower):
+                        continue
+                    if name_lower and name_lower not in f_lower:
+                        continue
+
+                    file_path = Path(root) / f
+                    try:
+                        sz = _format_size(file_path.stat().st_size)
+                    except Exception:
+                        sz = "?"
+                    results.append(f"[ARQUIVO] {f} ({sz}) -> {file_path}")
+                    if len(results) >= max_results:
+                        break
+                if len(results) >= max_results:
+                    break
+
+        if not results:
+            query = f"'{name}'" if name else f"extensão '{extension}'"
+            return f"Nenhum arquivo ou pasta encontrado com {query} em {search_path} (varridos {scanned_dirs} diretórios)."
+
+        header = f"Encontrado(s) {len(results)} item(ns) em {search_path}:\n"
+        return header + "\n".join(results)
 
     except Exception as e:
         return f"Search error: {e}"
@@ -691,12 +818,19 @@ def file_controller(
                 append=params.get("append", False)
             )
 
-        elif action == "find":
+        elif action in ("find", "find_files", "find_folder", "find_folders", "search"):
+            t_type = params.get("target_type", "")
+            if not t_type:
+                if action in ("find_folder", "find_folders") or "pasta" in name.lower():
+                    t_type = "folder"
+                else:
+                    t_type = "any"
             return find_files(
                 name=name or params.get("name", ""),
                 extension=params.get("extension", ""),
                 path=path,
-                max_results=min(int(params.get("max_results", 20)), 50),
+                target_type=t_type,
+                max_results=min(int(params.get("max_results", 25)), 50),
             )
 
         elif action == "largest":
@@ -724,17 +858,33 @@ def file_controller(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "file_controller",
-    "description": "Manages files and folders: list, create, delete, move, copy, rename, read, write, find, disk usage.",
+    "description": (
+        "Manages and navigates files and folders on the system. "
+        "Lists folders, searches/finds files and folders across disks/OneDrive, reads, writes, creates, deletes, moves, copies, and renames. "
+        "Supports shortcuts like desktop, documents, downloads, home, onedrive, workspace/project."
+    ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "list | create_file | create_folder | delete | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"
+                "description": "list | find | find_folders | create_file | create_folder | delete | move | copy | rename | read | write | largest | disk_usage | organize_desktop | info"
             },
             "path": {
                 "type": "STRING",
-                "description": "File/folder path or shortcut: desktop, downloads, documents, home"
+                "description": "File/folder path or shortcut: desktop, downloads, documents, onedrive, home, project, or full path like C:\\..."
+            },
+            "target_type": {
+                "type": "STRING",
+                "description": "Used with find: 'any' (files and folders), 'folder' (folders only), 'file' (files only). Default: 'any'"
+            },
+            "name": {
+                "type": "STRING",
+                "description": "File or folder name to search for or operate on"
+            },
+            "extension": {
+                "type": "STRING",
+                "description": "File extension to search (e.g. .py, .pdf, .docx)"
             },
             "destination": {
                 "type": "STRING",
@@ -747,14 +897,6 @@ TOOL = {
             "content": {
                 "type": "STRING",
                 "description": "Content for create_file/write"
-            },
-            "name": {
-                "type": "STRING",
-                "description": "File name to search for"
-            },
-            "extension": {
-                "type": "STRING",
-                "description": "File extension to search (e.g. .pdf)"
             },
             "count": {
                 "type": "INTEGER",

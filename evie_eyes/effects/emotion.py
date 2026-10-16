@@ -77,6 +77,14 @@ class EmotionFX:
                 ))
         self.active = tuple(fx)
 
+    def burst(self, kind: str = "star", count: int = 8) -> None:
+        """Dispara partículas festivas (estrelas, corações, faíscas) na tela."""
+        for _ in range(count):
+            if kind in ("star", "sparkle", "sparkles"):
+                self._sparkle()
+            elif kind in ("heart", "hearts"):
+                self._heart()
+
     def update(self, dt: float) -> None:
         for item in self._scheduled:
             item[0] -= dt

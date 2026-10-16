@@ -85,8 +85,32 @@ def _compress(img_bytes: bytes, source_format: str = "PNG") -> tuple[bytes, str]
         return img_bytes, f"image/{source_format.lower()}"
 
 
-def _capture_screen() -> tuple[bytes, str]:
+def _capture_screen(monitor_idx: int = 0) -> tuple[bytes, str]:
+    # 1. Tenta PyQt6 (rápido, suporte nativo a múltiplos monitores com coordenadas negativas)
+    try:
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtGui import QGuiApplication
+        from PyQt6.QtCore import QBuffer, QByteArray, QIODevice
+        app = QApplication.instance()
+        if app is None:
+            import sys
+            app = QApplication(sys.argv)
+        screens = QGuiApplication.screens()
+        if screens:
+            idx = monitor_idx if 0 <= monitor_idx < len(screens) else 0
+            screen = screens[idx]
+            pix = screen.grabWindow(0)
+            if pix.width() > 1920:
+                pix = pix.scaledToWidth(1920)
+            ba = QByteArray()
+            buf = QBuffer(ba)
+            buf.open(QIODevice.OpenModeFlag.WriteOnly)
+            pix.save(buf, "JPEG", 75)
+            return bytes(ba.data()), "image/jpeg"
+    except Exception:
+        pass
 
+    # 2. Fallback mss
     if not _MSS:
         raise RuntimeError("mss is not installed. Run: pip install mss")
 

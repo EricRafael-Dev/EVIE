@@ -652,7 +652,28 @@ ACTION_MAP: dict[str, callable] = {
     "toggle_wifi":         toggle_wifi,
     "restart":             restart_computer,
     "shutdown":            shutdown_computer,
+    "remote_desktop":      lambda: _remote_desktop_connect(),
+    "connect_computer":    lambda: _remote_desktop_connect(),
 }
+
+def _remote_desktop_connect() -> str:
+    try:
+        from dashboard import server
+        if server._SERVER_INSTANCE:
+            loop = getattr(server._SERVER_INSTANCE, "_loop", None)
+            coro = server._SERVER_INSTANCE.broadcast({
+                "type": "remote_desktop_authorized",
+                "message": "Conexão de Área de Trabalho Remota autorizada."
+            })
+            if loop and loop.is_running():
+                import asyncio
+                asyncio.run_coroutine_threadsafe(coro, loop)
+            else:
+                import asyncio
+                asyncio.create_task(coro)
+    except Exception as e:
+        print(f"[RemoteDesktop] Erro ao autorizar remote desktop: {e}")
+    return "Área de Trabalho Remota autorizada e conectada ao dispositivo móvel."
 
 # ── What needs a human, and what just needs an undo ──────────────────────────
 #
@@ -670,16 +691,18 @@ ACTION_MAP: dict[str, callable] = {
 # Asking before every action is what makes an assistant unusable, and every
 # question costs a round trip. Undo is both faster and safer than a prompt.
 _IRREVERSIBLE = {
-    "restart":     ("Restart this computer",
-                    "Anything unsaved will be lost. The computer restarts in 10 seconds."),
-    "shutdown":    ("Shut this computer down",
-                    "Anything unsaved will be lost. The computer powers off in 10 seconds."),
+    "restart":        ("Restart this computer",
+                       "Anything unsaved will be lost. The computer restarts in 10 seconds."),
+    "shutdown":       ("Shut this computer down",
+                       "Anything unsaved will be lost. The computer powers off in 10 seconds."),
     # Not obviously destructive, and that is exactly why it was missed: turning
     # the WiFi off cuts the assistant's own connection to the Live API, so it
     # cannot be asked to turn it back on.
-    "toggle_wifi": ("Switch WiFi off or on",
-                    "If this switches WiFi off, JARVIS loses its connection and "
-                    "cannot switch it back on by voice."),
+    "toggle_wifi":    ("Switch WiFi off or on",
+                       "If this switches WiFi off, JARVIS loses its connection and "
+                       "cannot switch it back on by voice."),
+    "remote_desktop": ("Conectar ao Computador / Espelhar Tela",
+                       "Permitir streaming da tela e controle remoto pelo smartphone?"),
 }
 
 # Kept so anything still importing the old name keeps working.
@@ -718,6 +741,7 @@ _ALIASES = {
     "new_tab":         ("open a tab", "open new tab"),
     "shutdown":        ("power off", "turn off the computer", "switch off the pc"),
     "restart":         ("reboot", "restart the pc"),
+    "remote_desktop":  ("conectar ao computador", "conectar computador", "espelhar tela", "remote desktop", "espelhar computador", "controlar computador", "acessar computador", "spaceview", "spacedesk"),
 }
 
 _VALUE_ACTIONS = {"volume_set", "type_text", "press_key", "reload_n",
@@ -911,20 +935,10 @@ def computer_settings(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "computer_settings",
-    "description": "Controls the computer: volume, brightness, window management, keyboard shortcuts, typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. Use for ANY single computer control command. restart, shutdown and toggle_wifi put a confirmation on the user's screen and do NOT happen until they press it — never claim they are done. Volume, brightness and dark mode can be reversed with the `undo` tool.",
+    "description": "Controls the computer: volume, brightness, window management, screen mirroring / remote desktop (SpaceView to mobile/emulator), keyboard shortcuts, typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. Use for ANY single computer control command. Use remote_desktop to mirror the computer screen to the smartphone/emulator or enable remote desktop control.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            # The exact vocabulary, spelled out.
-            #
-            # This used to say only "The action to perform", so the model
-            # usually filled `description` instead — and computer_settings then
-            # made a SECOND Gemini call, inside the tool, purely to translate
-            # that sentence into one of these names. Every "turn the volume
-            # down" cost two model round trips.
-            #
-            # Naming the actions here costs ~600 characters once per session and
-            # removes a whole round trip from every computer command.
             "action": {
                 "type": "STRING",
                 "description": (
@@ -941,13 +955,14 @@ TOOL = {
                     "undo | redo | select_all | save | enter | escape | press_key | "
                     "type_text | screenshot | lock_screen | open_settings | "
                     "file_explorer | open_run | dark_mode | toggle_wifi | "
-                    "restart | shutdown"
+                    "remote_desktop | restart | shutdown"
                 )
             },
             "description": {
                 "type": "STRING",
                 "description": (
                     "Fallback only, when no action name above fits. "
+                    "Pick remote_desktop to mirror screen to mobile/emulator or enable remote control. "
                     "Resolved locally — no extra model call."
                 )
             },

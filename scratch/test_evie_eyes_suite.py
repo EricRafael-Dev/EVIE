@@ -158,7 +158,7 @@ def test_hud_canvas_integration():
 
 def test_picture_in_picture_window():
     print("\n[4] Testando Picture-in-Picture Floating Window (PiP)...")
-    from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication, QPushButton
     from ui import PictureInPictureWindow
     
     app = QApplication.instance() or QApplication(sys.argv)

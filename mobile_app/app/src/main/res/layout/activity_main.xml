@@ -72,6 +72,18 @@
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_headset"
                 app:tint="@color/primary_accent" />
+
+            <ImageButton
+                android:id="@+id/btnRemoteDesktop"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:contentDescription="Área de Trabalho Remota (SpaceView)"
+                android:padding="5dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_menu_view"
+                app:tint="@color/primary_accent" />
         </LinearLayout>
 
         <!-- Center Title -->
@@ -776,5 +788,171 @@
             android:textStyle="bold" />
 
     </LinearLayout>
+
+    <!-- ========================================================================= -->
+    <!-- REMOTE DESKTOP SPACEVIEW OVERLAY (FULLSCREEN MIRROR & TOUCH CONTROL)      -->
+    <!-- ========================================================================= -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/remoteDesktopOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0A0E1A"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        android:clipChildren="true"
+        android:clipToPadding="true"
+        android:elevation="100dp">
+
+        <!-- Remote Screen Display (100% Fullscreen) -->
+        <ImageView
+            android:id="@+id/remoteScreenView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#000000"
+            android:scaleType="fitCenter"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Floating Discreet Pill to Toggle Toolbar -->
+        <ImageButton
+            android:id="@+id/btnToggleRemoteToolbar"
+            android:layout_width="54dp"
+            android:layout_height="22dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_hud_button_blue"
+            android:alpha="0.45"
+            android:src="@drawable/ic_chevron_down"
+            android:contentDescription="Alternar Barra de Controles"
+            android:padding="2dp"
+            android:scaleType="centerInside"
+            app:tint="@color/primary_accent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:elevation="125dp" />
+
+        <!-- Top Floating Control HUD (Hidden by Default) -->
+        <LinearLayout
+            android:id="@+id/remoteControlBar"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="#E6070C18"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp"
+            android:visibility="gone"
+            android:elevation="130dp"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextView
+                android:id="@+id/tvRemoteTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="monospace"
+                android:text="◈ PC: MONITOR 1 (3440x1440)"
+                android:textColor="@color/primary_accent"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnRemoteTouchMode"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:fontFamily="monospace"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="0dp"
+                android:text="📱 TOUCH"
+                android:textColor="@color/primary_accent"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btnRemoteZoomReset"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:fontFamily="monospace"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="0dp"
+                android:text="🔍 1.0x"
+                android:textColor="@color/primary_accent"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btnRemoteMonitorToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:fontFamily="monospace"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="0dp"
+                android:text="🖥️ M1 / M2"
+                android:textColor="@color/primary_accent"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btnRemoteKeyboard"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_hud_button_blue"
+                android:fontFamily="monospace"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="0dp"
+                android:text="⌨️"
+                android:textColor="@color/primary_accent"
+                android:textSize="11sp" />
+
+            <ImageButton
+                android:id="@+id/btnRemoteClose"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_hud_button_interrupt"
+                android:contentDescription="Fechar Área de Trabalho Remota"
+                android:padding="6dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                app:tint="@color/hud_red" />
+        </LinearLayout>
+
+        <!-- Hidden Input for Virtual Keyboard Capture -->
+        <EditText
+            android:id="@+id/etRemoteKeySink"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:alpha="0.01"
+            android:background="@null"
+            android:imeOptions="actionSend|flagNoExtractUi"
+            android:inputType="text|textMultiLine"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Loading Indicator -->
+        <ProgressBar
+            android:id="@+id/pbRemoteLoading"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

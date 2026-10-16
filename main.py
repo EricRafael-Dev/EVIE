@@ -2504,6 +2504,26 @@ class JarvisLive:
                 if not text:
                     continue
 
+                low_text = text.lower()
+                mirror_triggers = (
+                    "espelhar tela", "espelhar minha tela", "espelhar o computador",
+                    "espelhar computador", "conectar ao computador", "conectar computador",
+                    "conectar pc", "remote desktop", "spaceview"
+                )
+                if any(tr in low_text for tr in mirror_triggers):
+                    from actions.computer_settings import _remote_desktop_connect
+                    res_msg = _remote_desktop_connect()
+                    log_label = f"[{envelope.source_device_id}]"
+                    self.ui.write_log(f"{log_label}: {text}")
+                    self.ui.write_log(f"EVIE: {res_msg}")
+                    if self._dashboard:
+                        await self._dashboard.broadcast({
+                            "type": "log",
+                            "speaker": "jarvis",
+                            "text": f"◈ EVIE:\n  {res_msg}"
+                        })
+                    continue
+
                 self._current_command_envelope = envelope
                 dev_name = envelope.source_device_id
                 is_mobile = envelope.reply_audio_target in ("origin_ws", "mobile") or dev_name not in ("PC", "Web", "System")
@@ -2676,7 +2696,7 @@ class JarvisLive:
                         await self._dashboard.serve()
                     except asyncio.CancelledError:
                         break
-                    except Exception as exc:
+                    except (Exception, SystemExit) as exc:
                         print(f"[Dashboard] Error: {exc}")
                         self.ui.write_log(f"SYS: Dashboard error: {exc}")
                     await asyncio.sleep(3)
@@ -2926,7 +2946,11 @@ def main():
             print("\n🔴 Shutting down...")
 
     threading.Thread(target=runner, daemon=True).start()
-    ui.root.mainloop()
+    try:
+        ui.root.mainloop()
+    finally:
+        import os
+        os._exit(0)
 
 if __name__ == "__main__":
     main()

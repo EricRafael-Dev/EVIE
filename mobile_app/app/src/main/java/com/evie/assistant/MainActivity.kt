@@ -31,6 +31,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.ImageDecoder
+import android.graphics.Matrix
+import android.graphics.RectF
 import android.provider.OpenableColumns
 import android.speech.tts.TextToSpeech
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +46,8 @@ import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
@@ -363,6 +367,61 @@ class MainActivity : AppCompatActivity() {
         binding.btnContentDismiss.setOnClickListener {
             binding.contentCardLayout.visibility = View.GONE
         }
+
+        binding.btnRemoteDesktop?.setOnClickListener {
+            requestRemoteDesktopConnection()
+        }
+
+        binding.btnRemoteClose?.setOnClickListener {
+            closeRemoteDesktop()
+        }
+
+        binding.btnRemoteMonitorToggle?.setOnClickListener {
+            toggleRemoteMonitor()
+        }
+
+        binding.btnRemoteKeyboard?.setOnClickListener {
+            toggleRemoteKeyboard()
+        }
+
+        binding.btnToggleRemoteToolbar?.setOnClickListener {
+            val bar = binding.remoteControlBar ?: return@setOnClickListener
+            if (bar.visibility == View.VISIBLE) {
+                bar.visibility = View.GONE
+                binding.btnToggleRemoteToolbar?.alpha = 0.45f
+            } else {
+                bar.visibility = View.VISIBLE
+                binding.btnToggleRemoteToolbar?.alpha = 0.95f
+            }
+        }
+
+        binding.btnRemoteTouchMode?.setOnClickListener {
+            remoteInteractionMode = (remoteInteractionMode + 1) % 3
+            when (remoteInteractionMode) {
+                0 -> {
+                    binding.btnRemoteTouchMode?.text = "📱 TOUCH"
+                    Toast.makeText(this, "Modo Touch: 1 dedo rola página, 2 dedos pinça/arrasta zoom", Toast.LENGTH_SHORT).show()
+                }
+                1 -> {
+                    binding.btnRemoteTouchMode?.text = "🖐️ PAN"
+                    Toast.makeText(this, "Modo Navegar: 1 dedo arrasta tela ultrawide, toque clica", Toast.LENGTH_SHORT).show()
+                }
+                2 -> {
+                    binding.btnRemoteTouchMode?.text = "🖱️ MOUSE"
+                    Toast.makeText(this, "Modo Mouse: 1 dedo move cursor", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        binding.btnRemoteZoomReset?.setOnClickListener {
+            if (currentZoom > 1.05f) {
+                resetZoom()
+            } else {
+                quickZoom(2.5f)
+            }
+        }
+
+        setupRemoteDesktopTouchAndKeyboard()
     }
 
     private fun startClock() {
@@ -888,7 +947,16 @@ class MainActivity : AppCompatActivity() {
                         activeConfirmDialog = null
                         activeConfirmKey = null
                         appendLog("· SYS: Confirmação [$key] ${if (result) "AUTORIZADA" else "RECUSADA"}.", false)
+                        if (key == "remote_desktop" && result) {
+                            openRemoteDesktop()
+                        }
                     }
+                }
+            }
+
+            "remote_desktop_authorized" -> {
+                runOnUiThread {
+                    openRemoteDesktop()
                 }
             }
 
@@ -2567,11 +2635,491 @@ class MainActivity : AppCompatActivity() {
 
         mainHandler.removeCallbacks(clockRunnable)
         audioManager.stopStreaming()
+        remoteStreamJob?.cancel()
+        remoteStreamJob = null
         if (EvieBackgroundService.activeActivity == this) {
             EvieBackgroundService.activeActivity = null
         }
     }
 
+    // ── Remote Desktop & SpaceView Engine (Matrix GPU Zoom & Pan) ────────────
+    private var isRemoteDesktopActive = false
+    private var activeRemoteMonitor = 0
+    private var remoteMonitorsCount = 2
+    private var remoteStreamJob: kotlinx.coroutines.Job? = null
+    private var lastRemoteTouchNormX = 0.5f
+    private var lastRemoteTouchNormY = 0.5f
+    private var isTouchDragging = false
+
+    // Hardware GPU Matrix Zoom & Pan for Ultrawide Monitors
+    private val baseMatrix = Matrix()
+    private val currentMatrix = Matrix()
+    private var currentZoom = 1.0f
+    private var currentBitmapWidth = 0f
+    private var currentBitmapHeight = 0f
+    private var isBaseMatrixInit = false
+
+    // Interaction modes: 0 = TOUCH (Scroll PC), 1 = PAN (Drag zoomed screen), 2 = MOUSE (Pointer)
+    private var remoteInteractionMode = 0
+
+    private fun clampAndApplyMatrix() {
+        val viewW = binding.remoteScreenView.width.toFloat()
+        val viewH = binding.remoteScreenView.height.toFloat()
+        if (viewW <= 0f || viewH <= 0f || currentBitmapWidth <= 0f || currentBitmapHeight <= 0f) return
+
+        if (currentZoom <= 1.02f) {
+            currentZoom = 1.0f
+            currentMatrix.set(baseMatrix)
+        } else {
+            val rect = RectF(0f, 0f, currentBitmapWidth, currentBitmapHeight)
+            currentMatrix.mapRect(rect)
+            var deltaX = 0f
+            var deltaY = 0f
+
+            if (rect.width() <= viewW) {
+                deltaX = (viewW - rect.width()) / 2f - rect.left
+            } else {
+                if (rect.left > 0f) deltaX = -rect.left
+                else if (rect.right < viewW) deltaX = viewW - rect.right
+            }
+
+            if (rect.height() <= viewH) {
+                deltaY = (viewH - rect.height()) / 2f - rect.top
+            } else {
+                if (rect.top > 0f) deltaY = -rect.top
+                else if (rect.bottom < viewH) deltaY = viewH - rect.bottom
+            }
+
+            if (deltaX != 0f || deltaY != 0f) {
+                currentMatrix.postTranslate(deltaX, deltaY)
+            }
+        }
+
+        binding.remoteScreenView.imageMatrix = currentMatrix
+        val label = if (currentZoom <= 1.05f) "🔍 1.0x" else "🔍 ${"%.1f".format(currentZoom)}x"
+        binding.btnRemoteZoomReset?.text = label
+    }
+
+    private fun resetZoom() {
+        currentZoom = 1.0f
+        currentMatrix.set(baseMatrix)
+        clampAndApplyMatrix()
+    }
+
+    private fun quickZoom(targetScale: Float, focusX: Float = -1f, focusY: Float = -1f) {
+        val viewW = binding.remoteScreenView.width.toFloat()
+        val viewH = binding.remoteScreenView.height.toFloat()
+        if (viewW <= 0f || viewH <= 0f) return
+
+        val fx = if (focusX >= 0f) focusX else (viewW / 2f)
+        val fy = if (focusY >= 0f) focusY else (viewH / 2f)
+
+        currentMatrix.set(baseMatrix)
+        val factor = targetScale.coerceIn(1.0f, 6.0f)
+        currentMatrix.postScale(factor, factor, fx, fy)
+        currentZoom = factor
+        clampAndApplyMatrix()
+    }
+
+    private fun updateDesktopBitmap(bitmap: Bitmap) {
+        val prevW = currentBitmapWidth
+        val prevH = currentBitmapHeight
+        currentBitmapWidth = bitmap.width.toFloat()
+        currentBitmapHeight = bitmap.height.toFloat()
+
+        val viewW = binding.remoteScreenView.width.toFloat()
+        val viewH = binding.remoteScreenView.height.toFloat()
+
+        if (viewW > 0 && viewH > 0) {
+            val dimensionsChanged = (prevW != currentBitmapWidth || prevH != currentBitmapHeight)
+            if (!isBaseMatrixInit || dimensionsChanged) {
+                val src = RectF(0f, 0f, currentBitmapWidth, currentBitmapHeight)
+                val dst = RectF(0f, 0f, viewW, viewH)
+                baseMatrix.setRectToRect(src, dst, Matrix.ScaleToFit.CENTER)
+                if (!isBaseMatrixInit || currentZoom <= 1.05f) {
+                    currentMatrix.set(baseMatrix)
+                    currentZoom = 1.0f
+                }
+                isBaseMatrixInit = true
+            }
+        }
+
+        binding.remoteScreenView.setImageBitmap(bitmap)
+        binding.remoteScreenView.imageMatrix = currentMatrix
+    }
+
+    private fun mapTouchToRemoteCoords(touchX: Float, touchY: Float): Pair<Float, Float>? {
+        if (currentBitmapWidth <= 0f || currentBitmapHeight <= 0f) return null
+        val inv = Matrix()
+        if (!currentMatrix.invert(inv)) return null
+        val pts = floatArrayOf(touchX, touchY)
+        inv.mapPoints(pts)
+        val normX = (pts[0] / currentBitmapWidth).coerceIn(0f, 1f)
+        val normY = (pts[1] / currentBitmapHeight).coerceIn(0f, 1f)
+        return Pair(normX, normY)
+    }
+
+    private fun requestRemoteDesktopConnection() {
+        if (isRemoteDesktopActive) {
+            closeRemoteDesktop()
+            return
+        }
+        val req = JsonObject().apply {
+            addProperty("type", "remote_desktop_request")
+            addProperty("device", config.deviceName)
+        }
+        val sent = apiClient.sendWebSocketJson(req)
+        if (!sent) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val request = okhttp3.Request.Builder()
+                        .url("${config.httpBaseUrl}/api/remote_desktop/request")
+                        .addHeader("Authorization", "Bearer ${config.authToken}")
+                        .post(okhttp3.RequestBody.create(null, ByteArray(0)))
+                        .build()
+                    apiClient.client.newCall(request).execute()
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Erro ao conectar: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun openRemoteDesktop() {
+        if (isDestroyedActivity) return
+        isRemoteDesktopActive = true
+        isBaseMatrixInit = false
+        currentZoom = 1.0f
+        binding.remoteScreenView.scaleType = ImageView.ScaleType.MATRIX
+        binding.remoteScreenView.scaleX = 1.0f
+        binding.remoteScreenView.scaleY = 1.0f
+        binding.remoteScreenView.translationX = 0f
+        binding.remoteScreenView.translationY = 0f
+        binding.remoteControlBar?.visibility = View.GONE
+        binding.btnToggleRemoteToolbar?.alpha = 0.45f
+        binding.remoteDesktopOverlay.visibility = View.VISIBLE
+        binding.pbRemoteLoading.visibility = View.VISIBLE
+        updateRemoteTitle()
+
+        // Fetch monitors count
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val req = okhttp3.Request.Builder()
+                    .url("${config.httpBaseUrl}/api/remote_desktop/monitors")
+                    .addHeader("Authorization", "Bearer ${config.authToken}")
+                    .get()
+                    .build()
+                val resp = apiClient.client.newCall(req).execute()
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string() ?: ""
+                    val json = gson.fromJson(body, JsonObject::class.java)
+                    val count = json.optInt("count", 2)
+                    remoteMonitorsCount = if (count > 0) count else 2
+                }
+            } catch (_: Exception) {}
+        }
+
+        // Start stream loop (requesting crisp 1080p ultrawide 2560px width & quality 82)
+        remoteStreamJob?.cancel()
+        remoteStreamJob = lifecycleScope.launch(Dispatchers.IO) {
+            while (isRemoteDesktopActive && !isDestroyedActivity) {
+                try {
+                    val frameUrl = "${config.httpBaseUrl}/api/remote_desktop/frame?monitor=$activeRemoteMonitor&quality=82&width=2560&token=${config.authToken}"
+                    val req = okhttp3.Request.Builder()
+                        .url(frameUrl)
+                        .addHeader("Authorization", "Bearer ${config.authToken}")
+                        .get()
+                        .build()
+
+                    val resp = apiClient.client.newCall(req).execute()
+                    if (resp.isSuccessful) {
+                        val stream = resp.body?.byteStream()
+                        if (stream != null) {
+                            val bitmap = BitmapFactory.decodeStream(stream)
+                            if (bitmap != null) {
+                                withContext(Dispatchers.Main) {
+                                    if (isRemoteDesktopActive) {
+                                        binding.pbRemoteLoading.visibility = View.GONE
+                                        updateDesktopBitmap(bitmap)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                    kotlinx.coroutines.delay(120)
+                }
+                kotlinx.coroutines.delay(25)
+            }
+        }
+    }
+
+    private fun closeRemoteDesktop() {
+        isRemoteDesktopActive = false
+        remoteStreamJob?.cancel()
+        remoteStreamJob = null
+        resetZoom()
+        binding.remoteControlBar?.visibility = View.GONE
+        binding.remoteDesktopOverlay.visibility = View.GONE
+        hideSoftKeyboard(binding.etRemoteKeySink)
+    }
+
+    private fun toggleRemoteMonitor() {
+        activeRemoteMonitor = (activeRemoteMonitor + 1) % remoteMonitorsCount
+        resetZoom()
+        updateRemoteTitle()
+        binding.pbRemoteLoading.visibility = View.VISIBLE
+    }
+
+    private fun updateRemoteTitle() {
+        val label = if (activeRemoteMonitor == 0) "MONITOR 1 (PRINCIPAL)" else "MONITOR 2 (SECUNDÁRIO)"
+        binding.tvRemoteTitle.text = "◈ PC: $label"
+        binding.btnRemoteMonitorToggle.text = if (activeRemoteMonitor == 0) "🖥️ M1" else "🖥️ M2"
+    }
+
+    private fun toggleRemoteKeyboard() {
+        binding.etRemoteKeySink.requestFocus()
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+        imm?.showSoftInput(binding.etRemoteKeySink, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun hideSoftKeyboard(view: View) {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+        imm?.hideSoftInputFromWindow(view.windowToken, 0)
+    }
+
+    private fun sendRemoteInput(action: String, x: Float, y: Float, text: String = "", key: String = "", dy: Int = 0) {
+        val payload = JsonObject().apply {
+            addProperty("type", "remote_input")
+            addProperty("action", action)
+            addProperty("monitor", activeRemoteMonitor)
+            addProperty("x", x)
+            addProperty("y", y)
+            if (text.isNotEmpty()) addProperty("text", text)
+            if (key.isNotEmpty()) addProperty("key", key)
+            if (dy != 0) addProperty("dy", dy)
+        }
+        val sent = apiClient.sendWebSocketJson(payload)
+        if (!sent) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val mediaType = "application/json".toMediaType()
+                    val req = okhttp3.Request.Builder()
+                        .url("${config.httpBaseUrl}/api/remote_desktop/input")
+                        .addHeader("Authorization", "Bearer ${config.authToken}")
+                        .post(payload.toString().toRequestBody(mediaType))
+                        .build()
+                    apiClient.client.newCall(req).execute()
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun setupRemoteDesktopTouchAndKeyboard() {
+        var downTime = 0L
+        var downTouchX = 0f
+        var downTouchY = 0f
+        var lastTouchX = 0f
+        var lastTouchY = 0f
+        var lastScrollY = 0f
+        var isTwoFingerGesture = false
+        var hasMovedSignificant = false
+        var lastTapTime = 0L
+        var lastTapX = 0f
+        var lastTapY = 0f
+        var prevTwoFingerMidX = 0f
+        var prevTwoFingerMidY = 0f
+        var isTwoFingerPanning = false
+
+        val scaleDetector = android.view.ScaleGestureDetector(
+            this,
+            object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
+                    val factor = detector.scaleFactor
+                    val targetZoom = (currentZoom * factor).coerceIn(1.0f, 6.0f)
+                    val actualFactor = targetZoom / currentZoom
+                    currentZoom = targetZoom
+                    currentMatrix.postScale(actualFactor, actualFactor, detector.focusX, detector.focusY)
+                    clampAndApplyMatrix()
+                    return true
+                }
+            }
+        )
+
+        binding.remoteScreenView.setOnTouchListener { _, event ->
+            scaleDetector.onTouchEvent(event)
+
+            val coords = mapTouchToRemoteCoords(event.x, event.y)
+            val normX = coords?.first ?: 0.5f
+            val normY = coords?.second ?: 0.5f
+
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    downTime = System.currentTimeMillis()
+                    downTouchX = event.x
+                    downTouchY = event.y
+                    lastTouchX = event.x
+                    lastTouchY = event.y
+                    lastScrollY = event.y
+                    lastRemoteTouchNormX = normX
+                    lastRemoteTouchNormY = normY
+                    hasMovedSignificant = false
+                    isTwoFingerGesture = false
+                    isTwoFingerPanning = false
+                    isTouchDragging = false
+
+                    if (remoteInteractionMode == 2) {
+                        sendRemoteInput("move", normX, normY)
+                    }
+                }
+                android.view.MotionEvent.ACTION_POINTER_DOWN -> {
+                    if (event.pointerCount >= 2) {
+                        isTwoFingerGesture = true
+                        prevTwoFingerMidX = (event.getX(0) + event.getX(1)) / 2f
+                        prevTwoFingerMidY = (event.getY(0) + event.getY(1)) / 2f
+                        isTwoFingerPanning = true
+                    }
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    if (scaleDetector.isInProgress) {
+                        // Pinching handled cleanly by ScaleGestureDetector
+                        return@setOnTouchListener true
+                    }
+
+                    if (event.pointerCount >= 2) {
+                        // Two-finger pan across the zoomed view
+                        val midX = (event.getX(0) + event.getX(1)) / 2f
+                        val midY = (event.getY(0) + event.getY(1)) / 2f
+                        if (isTwoFingerPanning) {
+                            val dx = midX - prevTwoFingerMidX
+                            val dy = midY - prevTwoFingerMidY
+                            if (Math.abs(dx) > 1f || Math.abs(dy) > 1f) {
+                                hasMovedSignificant = true
+                                currentMatrix.postTranslate(dx, dy)
+                                clampAndApplyMatrix()
+                            }
+                        }
+                        prevTwoFingerMidX = midX
+                        prevTwoFingerMidY = midY
+                        return@setOnTouchListener true
+                    }
+
+                    // Single finger move
+                    val totalDistX = Math.abs(event.x - downTouchX)
+                    val totalDistY = Math.abs(event.y - downTouchY)
+                    if (totalDistX > 14f || totalDistY > 14f) {
+                        hasMovedSignificant = true
+                    }
+
+                    when (remoteInteractionMode) {
+                        0 -> { // TOUCH mode: 1 finger vertical drag scrolls PC
+                            if (hasMovedSignificant) {
+                                val deltaY = event.y - lastScrollY
+                                if (Math.abs(deltaY) >= 4f) {
+                                    val scrollAmount = (deltaY * 3.2f).toInt()
+                                    sendRemoteInput("scroll", normX, normY, dy = scrollAmount)
+                                    lastScrollY = event.y
+                                    lastRemoteTouchNormX = normX
+                                    lastRemoteTouchNormY = normY
+                                }
+                            }
+                        }
+                        1 -> { // PAN mode: 1 finger drag pans the ultrawide screen
+                            if (hasMovedSignificant) {
+                                val dx = event.x - lastTouchX
+                                val dy = event.y - lastTouchY
+                                currentMatrix.postTranslate(dx, dy)
+                                clampAndApplyMatrix()
+                                lastTouchX = event.x
+                                lastTouchY = event.y
+                            }
+                        }
+                        2 -> { // MOUSE mode: 1 finger moves mouse pointer
+                            val dx = Math.abs(normX - lastRemoteTouchNormX)
+                            val dy = Math.abs(normY - lastRemoteTouchNormY)
+                            if (dx > 0.005f || dy > 0.005f) {
+                                isTouchDragging = true
+                                sendRemoteInput("move", normX, normY)
+                                lastRemoteTouchNormX = normX
+                                lastRemoteTouchNormY = normY
+                            }
+                        }
+                    }
+                }
+                android.view.MotionEvent.ACTION_POINTER_UP -> {
+                    if (event.pointerCount == 2) {
+                        isTwoFingerPanning = false
+                    }
+                    if (isTwoFingerGesture && !hasMovedSignificant && !scaleDetector.isInProgress) {
+                        val duration = System.currentTimeMillis() - downTime
+                        if (duration < 450) {
+                            sendRemoteInput("right_click", normX, normY)
+                        }
+                    }
+                }
+                android.view.MotionEvent.ACTION_UP -> {
+                    val duration = System.currentTimeMillis() - downTime
+                    val now = System.currentTimeMillis()
+
+                    if (!hasMovedSignificant && !scaleDetector.isInProgress) {
+                        // Double-tap zoom toggle
+                        if (now - lastTapTime < 320 && Math.abs(event.x - lastTapX) < 40 && Math.abs(event.y - lastTapY) < 40) {
+                            if (currentZoom > 1.05f) {
+                                resetZoom()
+                            } else {
+                                quickZoom(2.5f, event.x, event.y)
+                            }
+                            lastTapTime = 0L
+                            return@setOnTouchListener true
+                        }
+                        lastTapTime = now
+                        lastTapX = event.x
+                        lastTapY = event.y
+
+                        if (isTwoFingerGesture) {
+                            sendRemoteInput("right_click", normX, normY)
+                        } else if (duration > 550) {
+                            sendRemoteInput("right_click", normX, normY)
+                        } else {
+                            sendRemoteInput("click", normX, normY)
+                        }
+                    } else if (remoteInteractionMode == 2 && isTouchDragging) {
+                        sendRemoteInput("up", normX, normY)
+                    }
+                }
+            }
+            true
+        }
+
+        // Virtual keyboard typing capture
+        binding.etRemoteKeySink.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (count > 0 && s != null) {
+                    val newText = s.subSequence(start, start + count).toString()
+                    sendRemoteInput("text", lastRemoteTouchNormX, lastRemoteTouchNormY, text = newText)
+                } else if (before > 0 && count == 0) {
+                    sendRemoteInput("key", lastRemoteTouchNormX, lastRemoteTouchNormY, key = "backspace")
+                }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+
+        binding.etRemoteKeySink.setOnEditorActionListener { _, actionId, event ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND ||
+                actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE ||
+                (event != null && event.keyCode == android.view.KeyEvent.KEYCODE_ENTER)
+            ) {
+                sendRemoteInput("key", lastRemoteTouchNormX, lastRemoteTouchNormY, key = "enter")
+                true
+            } else {
+                false
+            }
+        }
+    }
 }
 
 

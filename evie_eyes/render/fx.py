@@ -6,19 +6,27 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Sequence, Tupl
 
 import pygame
 
-from ..core.easing import clamp, ease_out_back, ease_out_cubic
-from ..effects.particles import Particle, heartbeat
-from .glyphs import draw_glyph
+try:
+    from evie_eyes.core.easing import clamp, ease_out_back, ease_out_cubic
+    from evie_eyes.effects.particles import Particle, heartbeat
+    from evie_eyes.render.glyphs import draw_glyph
+except ImportError:
+    from ..core.easing import clamp, ease_out_back, ease_out_cubic
+    from ..effects.particles import Particle, heartbeat
+    from .glyphs import draw_glyph
 
 if TYPE_CHECKING:
-    from .shapes import Layout
+    try:
+        from evie_eyes.render.shapes import Layout
+    except ImportError:
+        from .shapes import Layout
 
 RGB = Tuple[int, int, int]
 Point = Tuple[float, float]
 
 
 def _rgb(color: Sequence[float]) -> RGB:
-    return tuple(int(clamp(c, 0, 255)) for c in color)  # type: ignore[return-value]
+    return (int(clamp(color[0], 0, 255)), int(clamp(color[1], 0, 255)), int(clamp(color[2], 0, 255)))
 
 
 def _blit_canvas(surface: pygame.Surface, canvas: pygame.Surface, center: Point, alpha: float) -> None:
@@ -111,7 +119,7 @@ def _anger(surface: pygame.Surface, p: Particle, center: Point, unit: float) -> 
     _blit_canvas(surface, canvas, center, p.alpha)
 
 
-def _ring(surface: pygame.Surface, p: Particle, center: Point, unit: float, layout: "Layout") -> None:
+def _ring(surface: pygame.Surface, p: Particle, center: Point, unit: float, layout: Layout) -> None:
     grow = 1.0 + 0.45 * ease_out_cubic(p.progress)
     rx = (p.size_x if p.size_x is not None else p.size) * layout.eye_w * grow
     ry = p.size * layout.eye_h * grow
@@ -156,7 +164,7 @@ _DRAWERS: Dict[str, Callable[..., None]] = {
 }
 
 
-def draw_particles(surface: pygame.Surface, particles: Iterable[Particle], layout: "Layout", layer: str) -> None:
+def draw_particles(surface: pygame.Surface, particles: Iterable[Particle], layout: Layout, layer: str) -> None:
     """Desenha as partículas da camada `layer` ("back" atrás dos olhos, "front" na frente)."""
     unit = layout.eye_h
     for p in particles:

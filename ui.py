@@ -472,6 +472,11 @@ class HudCanvas(QWidget):
         self._global_mouse_tracking: bool = True
         self._listening_timeout_t: float = 0.0
 
+        # Sequência de despertar: Evie procura o cursor pela tela com curiosidade
+        self._wake_search_active: bool = True
+        self._wake_search_t: float = 0.0
+        self._wake_search_start_cursor: QPoint | None = None
+
         self._tmr = QTimer(self)
         self._tmr.timeout.connect(self._step)
         self._tmr.start(16)
@@ -568,6 +573,13 @@ class HudCanvas(QWidget):
             if hasattr(self._avatar.face, "set_custom_color"):
                 self._avatar.face.set_custom_color(green)
             self.update()
+
+    def trigger_wake_search(self) -> None:
+        """Inicia a rotina curiosa de despertar onde a Evie busca ativamente pelo cursor na tela."""
+        self._wake_search_active = True
+        self._wake_search_t = 0.0
+        self._wake_search_start_cursor = QCursor.pos()
+        self.update()
 
     def set_expression(self, name: str, duration: float | None = None) -> None:
         """Define uma expressão emocional facial no avatar procedural."""
@@ -727,20 +739,63 @@ class HudCanvas(QWidget):
                             if hasattr(self._avatar, "face") and hasattr(self._avatar.face, "idle"):
                                 if self._avatar.face.idle.stage == "asleep":
                                     self._avatar.face.idle.wake()
+                                    self.trigger_wake_search()
                                 elif self._avatar.face.idle.stage in ("sleepy", "bored"):
                                     self._avatar.face.idle.reset()
 
-                    local_pt = self.mapFromGlobal(cur_pos)
-                    head_cx = self.width() / 2.0
-                    head_cy = self.height() * 0.40
-                    rel_x = (local_pt.x() - head_cx) / max(100.0, self.width() * 0.50)
-                    rel_y = (local_pt.y() - head_cy) / max(100.0, self.height() * 0.50)
-                    target_gx = math.tanh(rel_x) * 0.85
-                    target_gy = math.tanh(rel_y) * 0.70
-                    if hasattr(self._avatar, "track_gaze"):
-                        self._avatar.track_gaze(target_gx, target_gy)
-                    elif hasattr(self._avatar, "glance"):
-                        self._avatar.glance(target_gx, target_gy, hold=2.0)
+                    # Rotina de busca do cursor ao despertar
+                    if self._wake_search_active:
+                        self._wake_search_t += dt
+                        if self._wake_search_start_cursor is None:
+                            self._wake_search_start_cursor = cur_pos
+
+                        moved_dist = math.hypot(
+                            cur_pos.x() - self._wake_search_start_cursor.x(),
+                            cur_pos.y() - self._wake_search_start_cursor.y()
+                        )
+
+                        # Encontrou o mouse (movimento significativo detectado ou timeout de ~3.2s)
+                        if (self._wake_search_t > 0.65 and moved_dist > 40) or self._wake_search_t >= 3.2:
+                            self._wake_search_active = False
+                            if hasattr(self._avatar, "hop"):
+                                self._avatar.hop(0.38)
+                            elif hasattr(self._avatar, "face") and hasattr(self._avatar.face, "hop"):
+                                self._avatar.face.hop.kick(0.38)
+                            if hasattr(self._avatar, "blink_now"):
+                                self._avatar.blink_now()
+                        else:
+                            # Coreografia curiosa procurando o mouse pela tela:
+                            st = self._wake_search_t
+                            if st < 0.8:
+                                # Olhar para a esquerda superior curiosa
+                                target_gx, target_gy = -0.68, -0.22
+                            elif st < 1.6:
+                                # Varrer para a direita superior
+                                target_gx, target_gy = 0.72, -0.10
+                            elif st < 2.4:
+                                # Varrer diagonalmente para a esquerda inferior
+                                target_gx, target_gy = -0.48, 0.32
+                            else:
+                                # Varrer para centro-direita
+                                target_gx, target_gy = 0.40, 0.18
+
+                            if hasattr(self._avatar, "track_gaze"):
+                                self._avatar.track_gaze(target_gx, target_gy)
+                            elif hasattr(self._avatar, "glance"):
+                                self._avatar.glance(target_gx, target_gy, hold=0.6)
+
+                    if not self._wake_search_active:
+                        local_pt = self.mapFromGlobal(cur_pos)
+                        head_cx = self.width() / 2.0
+                        head_cy = self.height() * 0.40
+                        rel_x = (local_pt.x() - head_cx) / max(100.0, self.width() * 0.50)
+                        rel_y = (local_pt.y() - head_cy) / max(100.0, self.height() * 0.50)
+                        target_gx = math.tanh(rel_x) * 0.85
+                        target_gy = math.tanh(rel_y) * 0.70
+                        if hasattr(self._avatar, "track_gaze"):
+                            self._avatar.track_gaze(target_gx, target_gy)
+                        elif hasattr(self._avatar, "glance"):
+                            self._avatar.glance(target_gx, target_gy, hold=2.0)
                 except Exception:
                     pass
             elif hasattr(self._avatar, "stop_tracking_gaze"):
@@ -3732,7 +3787,7 @@ class RemoteKeyOverlay(QWidget):
             qr.make(fit=True)
             img = qr.make_image(fill_color="black", back_color="white")
             buf = BytesIO()
-            img.save(buf, format="PNG")
+            img.save(buf)
             px = QPixmap()
             px.loadFromData(buf.getvalue())
             self._qr_label.setPixmap(
@@ -5290,13 +5345,27 @@ class MainWindow(QMainWindow):
 
     def quit_app(self) -> None:
         """Encerra a aplicação completamente quando solicitado pelo menu da bandeja ou comando."""
-        if hasattr(self, "_pip_window") and self._pip_window:
-            self._pip_window.close()
-        if hasattr(self, "_tray_icon") and self._tray_icon:
-            self._tray_icon.hide()
-        app = QApplication.instance()
-        if app:
-            app.quit()
+        try:
+            if hasattr(self, "_pip_window") and self._pip_window is not None:
+                try:
+                    self._pip_window.hide()
+                    self._pip_window.close()
+                    self._pip_window.deleteLater()
+                except Exception:
+                    pass
+            if hasattr(self, "_tray_icon") and self._tray_icon:
+                try:
+                    self._tray_icon.hide()
+                except Exception:
+                    pass
+            self.hide()
+            self.close()
+            app = QApplication.instance()
+            if app:
+                app.quit()
+        finally:
+            import os
+            os._exit(0)
 
 
     def _show_camera_frame(self, img_bytes: bytes):
@@ -7891,7 +7960,10 @@ class _RootShim:
 
 class JarvisUI:
     def __init__(self, face_path: str, size=None):
-        self._app = QApplication.instance() or QApplication(sys.argv)
+        app = QApplication.instance()
+        if not isinstance(app, QApplication):
+            app = QApplication(sys.argv)
+        self._app: QApplication = app
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setStyle("Fusion")
         self._win = MainWindow(face_path)
@@ -8043,10 +8115,17 @@ class JarvisUI:
         except Exception:
             pass
 
+    @property
+    def _avatar(self):
+        return getattr(self._win, "_avatar", None)
+
     def glance(self, dx: float, dy: float, hold: float = 1.1) -> None:
         """Ask the avatar to look somewhere for a moment (see HoloAvatar.glance)."""
         try:
-            if self._avatar is not None:
+            fn = getattr(self._win, "glance", None)
+            if callable(fn):
+                fn(dx, dy, hold)
+            elif self._avatar is not None and hasattr(self._avatar, "glance"):
                 self._avatar.glance(dx, dy, hold)
         except Exception:
             pass

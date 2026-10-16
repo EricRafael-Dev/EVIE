@@ -36,9 +36,10 @@ class SaccadeLayer:
         self._timer = rng.uniform(*hold)
         self._tx = 0.0
         self._ty = 0.0
-        # O olho direito é um pouco mais lento: vira um "atraso" orgânico.
-        self._left = (Spring(frequency=7.0, damping=0.75), Spring(frequency=7.0, damping=0.75))
-        self._right = (Spring(frequency=6.4, damping=0.78), Spring(frequency=6.4, damping=0.78))
+        # Molas elásticas com bounce suave e orgânico (underdamped harmonic oscillator)
+        # O olho direito possui leve defasagem temporal criando atraso visual tridimensional
+        self._left = (Spring(frequency=5.8, damping=0.52), Spring(frequency=5.8, damping=0.52))
+        self._right = (Spring(frequency=5.2, damping=0.56), Spring(frequency=5.2, damping=0.56))
         self._scan = False
         self._tracking = False
         self._travel_accum = 0.0

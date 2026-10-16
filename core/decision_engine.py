@@ -39,11 +39,11 @@ class MemoryDecision(BaseModel):
     """Classificação estruturada do conteúdo da conversa para o Segundo Cérebro."""
     should_extract_memory: bool = Field(
         default=False,
-        description="Verdadeiro se o diálogo contiver novos fatos sobre o usuário, preferências, projetos, relações ou regras duradouras a serem lembradas, ignorando saudações e comandos triviais."
+        description="User message contains new personal facts, preferences, projects, relationships or rules to remember in the second brain vault, excluding greetings and generic requests"
     )
     suggested_folder: Literal["perfil", "projetos", "entidades", "regras_e_skills", "none"] = Field(
         default="none",
-        description="Pasta de destino mais apropriada no Segundo Cérebro ou 'none' se não houver fato relevante."
+        description="Target vault folder: perfil, projetos, entidades, regras_e_skills, or none if no relevant fact"
     )
 
 
@@ -51,11 +51,11 @@ class RouteDecision(BaseModel):
     """Classificação para roteamento do tier LLM (AUTO)."""
     needs_web_search: bool = Field(
         default=False,
-        description="Verdadeiro se a solicitação exigir busca na web em tempo real, notícias, clima, cotações ou eventos recentes."
+        description="Request requires real-time web search, latest internet news, weather forecast, stock prices or online web search, NOT local files or PC folders"
     )
     needs_deep_reasoning: bool = Field(
         default=False,
-        description="Verdadeiro se a solicitação exigir raciocínio complexo, geração/análise de código, matemática, planejamento ou leitura detalhada."
+        description="Request requires deep reasoning, writing/debugging code, desktop apps, calculators, scripts, git commands, terminal execution or analytical planning"
     )
 
 
@@ -63,7 +63,7 @@ class VisionWarmupDecision(BaseModel):
     """Classificação para pré-aquecimento de captura de tela."""
     wants_visual_inspection: bool = Field(
         default=False,
-        description="Verdadeiro se o usuário está pedindo para ver, olhar, inspecionar ou analisar a tela atual ou o que está aberto no computador."
+        description="User asks to look at, inspect, view, or analyze the computer screen or display"
     )
 
 
@@ -108,8 +108,11 @@ class DecisionEngine:
                 t0 = time.monotonic()
                 import laya
 
-                # Carrega o checkpoint de decisões tipadas
-                agent = laya.load("typed-decisions", backend="eager")
+                # Tenta carregar o checkpoint multilingual ("ml") otimizado para PT-BR, com fallback para "typed-decisions"
+                try:
+                    agent = laya.load("ml", device="cpu")
+                except Exception:
+                    agent = laya.load("typed-decisions", backend="eager")
                 self._laya_agent = agent
                 elapsed = time.monotonic() - t0
                 logger.info(f"Modelo local JEV carregado com sucesso em {elapsed:.2f}s.")
@@ -125,7 +128,16 @@ class DecisionEngine:
         """Avaliação em sub-milissegundo para saudações e comandos comuns em PT-BR."""
         cleaned = text.strip().lower()
 
-        # Saudações simples e comandos triviais que jamais contêm fatos para o Segundo Cérebro
+        # Saudações simples, perguntas de cortesia e comandos triviais que jamais contêm fatos para o Segundo Cérebro
+        greeting_words = r"\b(oi|ol[aá]|bom\s+dia|boa\s+tarde|boa\s+noite|e\s+a[ií]|fala\s+a[ií]|salve|evie|jarvis|amig[ao]|tudo\s+bem(\s+com\s+voc[eê])?|como\s+(vai|voc[eê]\s+est[aá]|est[aá])|beleza|tranquilo|obrigad[oa]|valeu|show|perfeito|entendi|ok|certo|t[aá]\s+bom|tchau|at[eé]\s+(logo|mais|amanh[aã])|falou|abrir|fecha|pausa|desliga|mudo|cancela|para|sil[eê]ncio|que\s+horas\s+s[aã]o|qual\s+a\s+data\s+de\s+hoje|que\s+dia\s+[eé]\s+hoje)\b"
+        tokens_only = re.sub(r"[!?,.;:()\-]", " ", cleaned).strip()
+        remaining = re.sub(greeting_words, "", tokens_only).strip()
+        if not remaining or len(remaining.split()) == 0:
+            return (
+                MemoryDecision(should_extract_memory=False, suggested_folder="none"),
+                {"should_extract_memory": 0.99, "suggested_folder": 0.99},
+            )
+
         trivial_patterns = [
             r"^(oi|ol[aá]|bom dia|boa tarde|boa noite|e a[ií]|fala a[ií]|salve)((\s*,\s*|\s+)(evie|jarvis|amig[ao]))?[!., ]*$",
             r"^(tudo bem|como vai|como est[aá]|beleza|tranquilo)((\s*,\s*|\s+)(evie|jarvis))?[?., ]*$",
@@ -162,24 +174,13 @@ class DecisionEngine:
         """Detecção rápida de roteamento (SEARCH / SMART / FAST)."""
         cleaned = text.strip().lower()
 
-        # Padrões explícitos de busca web
-        search_patterns = [
-            r"(pesquis|busqu|procur|google|na internet|web search)",
-            r"(not[ií]cias|noticia de|previs[aã]o do tempo|temperatura em|clima em)",
-            r"(cota[cç][aã]o|d[oó]lar|euro|a[cç][oõ]es da|quanto est[aá] o)",
-            r"(quem ganhou|resultado do jogo|tabela do|plac[aá]r|campeonato)",
-            r"(lan[cç]amento|pre[cç]o de|comprar|onde vende)",
-        ]
-        for pattern in search_patterns:
-            if re.search(pattern, cleaned):
-                return (
-                    "SEARCH",
-                    RouteDecision(needs_web_search=True, needs_deep_reasoning=False),
-                    {"needs_web_search": 0.95, "needs_deep_reasoning": 0.10},
-                )
-
-        # Padrões explícitos de raciocínio profundo / código
+        # 1. Padrões explícitos de raciocínio profundo / código / git / terminal / calculadora
         smart_patterns = [
+            r"\b(git\s+(push|pull|commit|init|status|checkout|branch|add|clone|merge|diff|log|remote))\b",
+            r"\b(terminal|cmd|powershell|prompt|linha\s+de\s+comando)\b",
+            r"\b(calculadora|calculator)\b",
+            r"(execut(e|ar|a)|rod(e|ar|a))\s+.*?\b(comando|script|c[oó]digo|calculadora|app)\b",
+            r"(cria|crie|faz|fa[cç]a|gerar?)\s+.*?\b(calculadora|script|c[oó]digo|programa|app)\b",
             r"(c[oó]digo|program|fun[cç][aã]o|classe|script|algoritmo|debug|refator)",
             r"(resolva|equa[cç][aã]o|calcule|derivada|integral|l[oó]gica|planeje|estrat[eé]gia)",
             r"(analise detalhadamente|compare os pr[oó]s e contras|fa[cç]a uma reda[cç][aã]o)",
@@ -193,9 +194,33 @@ class DecisionEngine:
                     {"needs_web_search": 0.05, "needs_deep_reasoning": 0.95},
                 )
 
-        # Diálogos conversacionais casuais / saudações -> FAST
+        # 2. Detecção de arquivos / pastas locais (para não disparar busca na internet acidentalmente)
+        local_file_patterns = [
+            r"\b(arquivo|arquivos|pasta|pastas|diret[oó]rio|diret[oó]rios)\b",
+            r"\b(no\s+meu\s+computador|no\s+computador|no\s+pc|no\s+desktop|na\s+[aá]rea\s+de\s+trabalho|nos\s+documentos|no\s+onedrive|no\s+disco)\b",
+        ]
+        is_local_file_query = any(re.search(p, cleaned) for p in local_file_patterns)
+
+        # 3. Padrões explícitos de busca web (apenas quando não é busca de arquivos locais)
+        if not is_local_file_query:
+            search_patterns = [
+                r"(pesquis|busqu|procur|google|na internet|web search)",
+                r"(not[ií]cias|noticia de|previs[aã]o do tempo|temperatura em|clima em)",
+                r"(cota[cç][aã]o|d[oó]lar|euro|a[cç][oõ]es da|quanto est[aá] o)",
+                r"(quem ganhou|resultado do jogo|tabela do|plac[aá]r|campeonato)",
+                r"(lan[cç]amento|pre[cç]o de|comprar|onde vende)",
+            ]
+            for pattern in search_patterns:
+                if re.search(pattern, cleaned):
+                    return (
+                        "SEARCH",
+                        RouteDecision(needs_web_search=True, needs_deep_reasoning=False),
+                        {"needs_web_search": 0.95, "needs_deep_reasoning": 0.10},
+                    )
+
+        # 4. Diálogos conversacionais casuais / saudações -> FAST
         fast_dialog_patterns = [
-            r"^(como\s+voc[eê]\s+est[aá]|tudo\s+bem|como\s+vai|quem\s+[eé]\s+voc[eê]|qual\s+o?\s*seu\s+nome)[?., ]*$",
+            r"^(como\s+voc[eê]\s+est[aá]|tudo\s+bem(\s+com\s+voc[eê])?|como\s+vai|quem\s+[eé]\s+voc[eê]|qual\s+o?\s*seu\s+nome)[?., ]*$",
             r"^(oi|ol[aá]|bom\s+dia|boa\s+tarde|boa\s+noite|valeu|obrigad[oa]|tchau)[?., !]*$",
         ]
         for pattern in fast_dialog_patterns:
@@ -206,8 +231,8 @@ class DecisionEngine:
                     {"needs_web_search": 0.01, "needs_deep_reasoning": 0.01},
                 )
 
-        # Comandos curtos ou saudações diretas -> FAST
-        if len(cleaned.split()) <= 4 and not re.search(r"\?", cleaned):
+        # 5. Comandos curtos ou saudações diretas -> FAST (desde que não sejam técnicos nem busca local)
+        if len(cleaned.split()) <= 4 and not re.search(r"\?", cleaned) and not is_local_file_query:
             return (
                 "FAST",
                 RouteDecision(needs_web_search=False, needs_deep_reasoning=False),
@@ -233,7 +258,7 @@ class DecisionEngine:
 
         # Se for comando de áudio puro ou sem relação visual
         pure_audio = [
-            r"^(aumenta|abaixa|volume|mudo|para a m[uú]sica|toca)",
+            r"\b(aument(a|e)|abaix(a|e)|volume|mudo|para a m[uú]sica|toc(a|e))\b",
             r"^(ol[aá]|bom dia|boa tarde|boa noite|quem [eé] voc[eê])",
         ]
         for pattern in pure_audio:
