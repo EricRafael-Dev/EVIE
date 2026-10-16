@@ -665,7 +665,7 @@ class JarvisLive:
         self._bg_executor = ThreadPoolExecutor(max_workers=6, thread_name_prefix="evie_bg")
 
         _base_dir = Path(__file__).resolve().parent
-        _inline_names = {t["name"] for t in TOOL_DECLARATIONS}
+        _inline_names: set[str] = {str(t["name"]) for t in TOOL_DECLARATIONS}
 
         # File-backed tools: every actions/*.py with a TOOL dict, discovered the
         # same way plugins are. Reserved names = the inline tools above, so an
@@ -978,7 +978,7 @@ class JarvisLive:
         """Turn hold-to-talk on or off. Returns the scope actually achieved."""
         from core.hotkey import PushToTalk
 
-        self._ptt_enabled = bool(enabled)
+        self._ptt_enabled = enabled
         self._ptt_held = False
         if not enabled:
             if self._ptt is not None:
@@ -1059,7 +1059,7 @@ class JarvisLive:
         )
 
     def speak_error(self, tool_name: str, error: str):
-        short = str(error)[:120]
+        short = error[:120]
         self.ui.write_log(f"ERR: {tool_name} — {short}")
         self.speak(f"Sir, {tool_name} encountered an error. {short}")
 
@@ -1301,6 +1301,8 @@ class JarvisLive:
                     self._vision_last_time = _now
                     angle     = args.get("angle", "screen").lower()
                     user_text = args.get("text", "What do you see?")
+                    img_b: bytes = b""
+                    mime_t: str = "image/jpeg"
                     if angle == "camera":
                         try:
                             img_b, mime_t = await loop.run_in_executor(self._rt_executor, _capture_camera)
@@ -1310,7 +1312,11 @@ class JarvisLive:
                             _stall = "camera"
                         except Exception as _cam_err:
                             self._vision_busy = False
-                            return f"Host PC camera not available ({_cam_err}). If a mobile photo was provided, analyze that image instead."
+                            return types.FunctionResponse(
+                                id=fc.id,
+                                name=name,
+                                response={"result": f"Host PC camera not available ({_cam_err}). If a mobile photo was provided, analyze that image instead."}
+                            )
                     else:
                         used_warmup = False
                         if self._vision_warmup_frame is not None:
@@ -1409,12 +1415,12 @@ class JarvisLive:
         except Exception as e:
             result = f"Tool '{name}' failed: {e}"
             traceback.print_exc()
-            self.speak_error(name, e)
+            self.speak_error(name, str(e))
 
         if not self.ui.muted:
             self.ui.set_state("LISTENING")
 
-        print(f"[JARVIS] 📤 {name} → {str(result)[:80]}")
+        print(f"[JARVIS] 📤 {name} → {result[:80]}")
 
         # A tool that declared itself NON_BLOCKING also says when its answer may
         # re-enter the conversation. Without this the model finishes whatever it
@@ -2656,6 +2662,7 @@ class JarvisLive:
                     except Exception:
                         pass
             confirm.set_remote_broadcast_callback(_broadcast_confirm)
+            confirm.set_result_callback(lambda txt: self._on_text_command(txt))
 
             # Mobile Vision handler
             async def _handle_mobile_vision(img_bytes: bytes, mime_type: str, prompt: str, device_id: str):

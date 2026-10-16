@@ -574,11 +574,15 @@ class EvieEyesAvatar:
                 self.face.poke()
 
     def set_muted(self, val: bool) -> None:
+        was_muted = self._muted
         self._muted = bool(val)
-        if self._muted:
-            self.set_expression("sleepy")
-        else:
+        if self._muted and not was_muted:
+            # Reação rápida e sutil de mute: dura no máximo 1.0s e retorna logo para neutral vivo
+            self.set_expression("sleepy", duration=1.0)
+            self.face.blink_now(double=True)
+        elif not self._muted and was_muted:
             self.set_expression("neutral")
+            self.face.blink_now()
 
     def set_state(self, val: str) -> None:
         self.set_visual_state(val)
@@ -668,8 +672,6 @@ class EvieEyesAvatar:
         if state and self.face.expression == "neutral":
             if state in ("THINKING", "PROCESSING"):
                 self.face.look_at(0.45, -0.55, hold=2.0)
-            elif state == "MUTED":
-                self.set_expression("sleepy")
 
         # Reatividade dinâmica da voz: respiração viva e dilatação proporcional ao áudio
         if self._speaking:

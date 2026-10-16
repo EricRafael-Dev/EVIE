@@ -7897,7 +7897,7 @@ class MainWindow(QMainWindow):
                 self.hud.set_visual_state("SPEAKING")
             elif state == "LISTENING":
                 self.hud.set_visual_state("IDLE_OBSERVING")
-            elif state == "IDLE":
+            elif state in ("IDLE", "MUTED"):
                 self.hud.set_visual_state("IDLE_OBSERVING")
         if hasattr(self, "_pip_window") and self._pip_window and self._pip_window.isVisible():
             self._pip_window.hud.state = state
@@ -8082,6 +8082,30 @@ class JarvisUI:
     @wake_get_state.setter
     def wake_get_state(self, cb):
         self._win.wake_get_state = cb
+
+    @property
+    def request_say(self):
+        return getattr(self._win, "request_say", None)
+
+    @request_say.setter
+    def request_say(self, cb):
+        self._win.request_say = cb
+
+    @property
+    def wake_is_ready(self):
+        return getattr(self._win, "wake_is_ready", None)
+
+    @wake_is_ready.setter
+    def wake_is_ready(self, cb):
+        self._win.wake_is_ready = cb
+
+    @property
+    def on_wake_install(self):
+        return getattr(self._win, "on_wake_install", None)
+
+    @on_wake_install.setter
+    def on_wake_install(self, cb):
+        self._win.on_wake_install = cb
 
     def set_audio_level(self, level: float) -> None:
         """Thread-safe: feed a 0.0–1.0 live audio level to the HUD waveform.

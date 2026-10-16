@@ -33,10 +33,10 @@ _PROJECT_ROOT = _get_project_root()
 
 def _resolve_working_dir(raw: str | None = None) -> Path:
     """Resolve shorthand or path to an absolute existing directory."""
-    if not raw or str(raw).strip() in ("", ".", "here", "current", "project", "workspace", "mark-lv", "mark-lv-main"):
+    if not raw or raw.strip() in ("", ".", "here", "current", "project", "workspace", "mark-lv", "mark-lv-main"):
         return _PROJECT_ROOT
 
-    s = str(raw).strip().strip('"').strip("'").lower()
+    s = raw.strip().strip('"').strip("'").lower()
 
     # Detect OneDrive and system user paths
     user_home = Path.home()
@@ -111,13 +111,126 @@ def _is_sensitive_command(cmd: str) -> bool:
     return any(p in c for p in _SENSITIVE_PATTERNS)
 
 
+def _detect_and_auto_heal(
+    command: str,
+    cwd: Path,
+    returncode: int,
+    stdout: str,
+    stderr: str,
+    shell_type: str = "powershell",
+    timeout: int = 60,
+    depth: int = 0
+) -> tuple[bool, str]:
+    """
+    Diagnose command failures proactively and execute corrective alternatives.
+    Returns (healed: bool, healing_log: str).
+    """
+    if returncode == 0 or depth >= 2:
+        return False, ""
+
+    combined_err = f"{stdout}\n{stderr}".lower()
+    cmd_lower = command.strip().lower()
+    healing_steps = []
+
+    # 1. Git push: No upstream branch
+    # "fatal: The current branch <branch> has no upstream branch."
+    # "To push the current branch and set the remote as upstream, use: git push --set-upstream origin <branch>"
+    if "no upstream branch" in combined_err or "set-upstream" in combined_err:
+        # Determine current branch
+        branch = "main"
+        try:
+            b_res = subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace"
+            )
+            out_b = (b_res.stdout or "").strip()
+            if out_b:
+                branch = out_b
+        except Exception:
+            pass
+
+        fix_cmd = f"git push --set-upstream origin {branch}"
+        healing_steps.append(f"Detectado branch sem upstream no Git. Executando correcao automatica: '{fix_cmd}'")
+        res_fix = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", fix_cmd] if _OS == "Windows" else ["/bin/bash", "-c", fix_cmd],
+            cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout
+        )
+        if res_fix.returncode == 0:
+            return True, f"-> Auto-recuperacao bem-sucedida: branch '{branch}' configurada no upstream e enviada para o remoto com sucesso!\n{res_fix.stdout or res_fix.stderr}"
+        else:
+            healing_steps.append(f"Tentativa de upstream retornou erro: {res_fix.stderr or res_fix.stdout}")
+
+    # 2. Git push rejected (non-fast-forward / fetch first)
+    if "fetch first" in combined_err or "[rejected]" in combined_err or "non-fast-forward" in combined_err:
+        fix_cmd = "git pull --rebase"
+        healing_steps.append(f"Detectadas alteracoes remotas pendentes. Executando 'git pull --rebase'...")
+        p_res = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", fix_cmd] if _OS == "Windows" else ["/bin/bash", "-c", fix_cmd],
+            cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout
+        )
+        if p_res.returncode == 0:
+            # Re-try the original push
+            retry_res = subprocess.run(
+                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command] if _OS == "Windows" else ["/bin/bash", "-c", command],
+                cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout
+            )
+            if retry_res.returncode == 0:
+                return True, f"-> Auto-recuperacao bem-sucedida: git pull --rebase sincronizado e push concluido com sucesso!\n{retry_res.stdout or retry_res.stderr}"
+            else:
+                healing_steps.append(f"Push apos rebase falhou: {retry_res.stderr}")
+        else:
+            healing_steps.append(f"Rebase falhou: {p_res.stderr}")
+
+    # 3. Git commit without staged files
+    if ("nothing added to commit" in combined_err or "no changes added to commit" in combined_err) and "git commit" in cmd_lower:
+        fix_cmd = "git add -A"
+        healing_steps.append("Detectado commit sem arquivos staged. Executando 'git add -A' e reexecutando commit...")
+        subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", fix_cmd] if _OS == "Windows" else ["/bin/bash", "-c", fix_cmd],
+            cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout
+        )
+        retry_res = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command] if _OS == "Windows" else ["/bin/bash", "-c", command],
+            cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout
+        )
+        if retry_res.returncode == 0:
+            return True, f"-> Auto-recuperacao bem-sucedida: arquivos adicionados com 'git add -A' e commit realizado!\n{retry_res.stdout}"
+
+    # 4. Missing python module during script execution
+    # "ModuleNotFoundError: No module named 'xyz'"
+    import re
+    mod_match = re.search(r"ModuleNotFoundError:\s+No module named ['\"]([^'\"]+)['\"]", f"{stdout}\n{stderr}")
+    if mod_match:
+        missing_module = mod_match.group(1).strip()
+        pip_cmd = f"{sys.executable} -m pip install {missing_module}"
+        healing_steps.append(f"Detectado modulo Python ausente ('{missing_module}'). Instalando via '{pip_cmd}'...")
+        pip_res = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", pip_cmd] if _OS == "Windows" else ["/bin/bash", "-c", pip_cmd],
+            cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
+        )
+        if pip_res.returncode == 0:
+            # Retry script
+            retry_res = subprocess.run(
+                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command] if _OS == "Windows" else ["/bin/bash", "-c", command],
+                cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout
+            )
+            if retry_res.returncode == 0:
+                return True, f"-> Auto-recuperacao bem-sucedida: pacote '{missing_module}' instalado e comando finalizado com sucesso!\n{retry_res.stdout}"
+
+    # If steps were attempted but couldn't completely resolve it
+    if healing_steps:
+        return False, "Diagnostico proativo tentado:\n" + "\n".join(healing_steps)
+
+    return False, ""
+
+
 def _run_command_sync(
     command: str,
     cwd: Path,
     shell_type: str = "powershell",
     timeout: int = 60
 ) -> str:
-    """Execute command synchronously and capture output."""
+    """Execute command synchronously, capture output, and autonomously heal common failures."""
     try:
         if not cwd.exists():
             cwd.mkdir(parents=True, exist_ok=True)
@@ -130,7 +243,6 @@ def _run_command_sync(
             if shell_type.lower() == "cmd":
                 args = ["cmd.exe", "/c", command]
             else:
-                # If command in PowerShell begins with an executable in quotes or call, prepend &
                 ps_cmd = command
                 if ps_cmd.startswith('"') or ps_cmd.startswith("'"):
                     ps_cmd = f"& {ps_cmd}"
@@ -151,6 +263,26 @@ def _run_command_sync(
 
         stdout = (res.stdout or "").strip()
         stderr = (res.stderr or "").strip()
+
+        # Autonomous healing check on error
+        if res.returncode != 0:
+            healed, heal_details = _detect_and_auto_heal(
+                command=command,
+                cwd=cwd,
+                returncode=res.returncode,
+                stdout=stdout,
+                stderr=stderr,
+                shell_type=shell_type,
+                timeout=timeout
+            )
+            if healed:
+                return (
+                    f"[Concluído com Auto-Recuperação Proativa]\n"
+                    f"Comando original: {command}\n"
+                    f"Ação corretiva executada:\n{heal_details}"
+                )
+            elif heal_details:
+                stderr += f"\n\n[Diagnóstico Proativo]:\n{heal_details}"
 
         output_parts = []
         if stdout:

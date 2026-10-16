@@ -64,6 +64,7 @@ _show_cb: Optional[Callable[[str, str], None]] = None
 _hide_cb: Optional[Callable[[], None]] = None
 _log_cb:  Optional[Callable[[str], None]] = None
 _remote_broadcast_cb: Optional[Callable[[dict], None]] = None
+_result_cb: Optional[Callable[[str], None]] = None
 
 
 def bind(show, hide, log=None) -> None:
@@ -76,6 +77,12 @@ def set_remote_broadcast_callback(cb: Callable[[dict], None]) -> None:
     """Registra callback para espelhar pedidos de confirmacao via WebSocket para mobile/tablet."""
     global _remote_broadcast_cb
     _remote_broadcast_cb = cb
+
+
+def set_result_callback(cb: Callable[[str], None]) -> None:
+    """Registra callback para entregar o resultado da ação confirmada de volta à sessão do assistente."""
+    global _result_cb
+    _result_cb = cb
 
 
 def _log(msg: str) -> None:
@@ -167,14 +174,29 @@ def resolve(accepted: bool) -> None:
 
     if not accepted:
         _log(f"SYS: Cancelled — {p.title}")
+        if _result_cb:
+            try:
+                _result_cb(f"[SISTEMA - AÇÃO CANCELADA PELO USUÁRIO]\nAção: {p.title}\nO usuário cancelou a execução no painel de confirmação.")
+            except Exception:
+                pass
         return
 
     def _worker():
         try:
             result = p.run() or "Done."
             _log(f"SYS: Confirmed — {p.title}. {result}")
+            if _result_cb:
+                try:
+                    _result_cb(f"[SISTEMA - RESPOSTA DA AÇÃO CONFIRMADA]\nAção: {p.title}\n{result}")
+                except Exception as cb_err:
+                    _log(f"ERR: result_callback failed: {cb_err}")
         except Exception as e:
             _log(f"ERR: {p.title} failed — {e}")
+            if _result_cb:
+                try:
+                    _result_cb(f"[SISTEMA - RESPOSTA DA AÇÃO CONFIRMADA]\nAção: {p.title}\nFalhou com erro: {e}")
+                except Exception:
+                    pass
 
     threading.Thread(target=_worker, daemon=True,
                      name=f"confirm-{p.key}").start()
