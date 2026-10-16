@@ -196,7 +196,30 @@ def _detect_and_auto_heal(
         if retry_res.returncode == 0:
             return True, f"-> Auto-recuperacao bem-sucedida: arquivos adicionados com 'git add -A' e commit realizado!\n{retry_res.stdout}"
 
-    # 4. Missing python module during script execution
+    # 4. Git SSH: Host key verification failed
+    if "host key verification failed" in combined_err or "permission denied (publickey)" in combined_err:
+        # Check if the host key can be added automatically
+        healing_steps.append("Detectada falha de chave de host SSH. Registrando chave de host do GitHub via StrictHostKeyChecking...")
+        subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "ssh -o StrictHostKeyChecking=accept-new -T git@github.com"],
+            cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15
+        )
+        # Check if the remote is a dummy / placeholder URL
+        try:
+            r_res = subprocess.run(
+                ["git", "remote", "get-url", "origin"],
+                cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace"
+            )
+            remote_url = (r_res.stdout or "").strip()
+            if "username/repository.git" in remote_url or "usuario/repositorio" in remote_url:
+                healing_steps.append(
+                    f"Aviso crítico: A URL do seu repositório remoto está configurada como '{remote_url}' (placeholder de exemplo). "
+                    "Para fazer o push no GitHub, configure seu repositório real com: git remote set-url origin https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git"
+                )
+        except Exception:
+            pass
+
+    # 5. Missing python module during script execution
     # "ModuleNotFoundError: No module named 'xyz'"
     import re
     mod_match = re.search(r"ModuleNotFoundError:\s+No module named ['\"]([^'\"]+)['\"]", f"{stdout}\n{stderr}")
